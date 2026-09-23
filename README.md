@@ -54,6 +54,14 @@ xcodebuild \
 
 The personal, arm64 `0.1.0` release candidate is available at `dist/SwiftyTranscoder_0.1.0_arm64.dmg`, with its SHA-256 checksum in `dist/SHA256SUMS.txt`. It is ad-hoc signed for local use, not Developer ID signed or notarized. Homebrew `ffprobe` and `ffmpeg-full` must already be installed at the paths listed above.
 
+Create a verified local release from the repository root with:
+
+```fish
+Scripts/build-release.sh
+```
+
+The script refuses to replace an existing DMG for the current version. To deliberately rebuild and replace that artifact, use `Scripts/build-release.sh --force`.
+
 ## Workflow
 
 1. Choose one MKV.
