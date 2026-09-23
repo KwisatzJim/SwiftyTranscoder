@@ -157,6 +157,7 @@ struct ContentView: View {
                 return
             }
 
+            conversionController.reset()
             selectedSource = source
             inspection = nil
             gainEnabled = true
