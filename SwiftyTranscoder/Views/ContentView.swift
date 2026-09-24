@@ -15,6 +15,8 @@ struct ContentView: View {
     @State private var subtitleSelection = SubtitleSelection.needsChoice
     @State private var outputURL: URL?
     @AppStorage("savedOutputFolderPath") private var savedOutputFolderPath = ""
+    @AppStorage("defaultGainEnabled") private var defaultGainEnabled = true
+    @AppStorage("defaultSubtitleMode") private var defaultSubtitleMode = "recommended"
 
     private static let sourceTypes: [UTType] = [
         UTType(filenameExtension: "mkv") ?? .data,
@@ -187,7 +189,8 @@ struct ContentView: View {
                 colorSelection: $colorSelection,
                 subtitleSelection: $subtitleSelection,
                 outputURL: $outputURL,
-                savedOutputFolderPath: $savedOutputFolderPath
+                savedOutputFolderPath: $savedOutputFolderPath,
+                saveDefaults: saveCurrentDefaults
             )
 
             VideoConversionControlsView(
@@ -252,7 +255,7 @@ struct ContentView: View {
         conversionController.reset()
         selectedSource = source
         inspection = nil
-        gainEnabled = true
+        gainEnabled = defaultGainEnabled
         colorSelection = .needsConfirmation
         subtitleSelection = .needsChoice
         outputURL = nil
@@ -288,17 +291,25 @@ struct ContentView: View {
                 let result = try await probe.inspect(source)
                 inspection = result
                 colorSelection = ColorSelection(video: result.videoStreams.first)
-                subtitleSelection = SubtitleSelection(
+                let recommendedSelection = SubtitleSelection(
                     recommendation: SubtitleRecommendationEngine().recommend(
                         from: result.subtitleStreams,
                         primaryAudio: result.audioStreams.first
                     )
                 )
+                subtitleSelection = defaultSubtitleMode == "omit"
+                    ? .omit
+                    : recommendedSelection
             } catch {
                 inspection = nil
                 selectionError = error.localizedDescription
             }
         }
+    }
+
+    private func saveCurrentDefaults() {
+        defaultGainEnabled = gainEnabled
+        defaultSubtitleMode = subtitleSelection == .omit ? "omit" : "recommended"
     }
 
     private func canStartVideoConversion(inspection: MediaInspection) -> Bool {

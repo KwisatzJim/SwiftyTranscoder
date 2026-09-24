@@ -75,6 +75,8 @@ The script refuses to replace an existing DMG for the current version. To delibe
 
 SwiftyTranscoder never deletes or modifies the source MKV.
 
+The conversion plan can remember gain and subtitle-policy defaults across sources and app launches. Specific subtitle stream numbers and color confirmations are always source-specific and are never reused.
+
 ## Supported version-1 path
 
 | Area | Supported behavior |

@@ -12,6 +12,8 @@ struct ConversionPlanView: View {
     @Binding var subtitleSelection: SubtitleSelection
     @Binding var outputURL: URL?
     @Binding var savedOutputFolderPath: String
+    let saveDefaults: () -> Void
+    @State private var defaultsSaved = false
 
     var body: some View {
         GroupBox {
@@ -86,6 +88,22 @@ struct ConversionPlanView: View {
                     .font(.callout)
                 }
 
+                Divider()
+                HStack {
+                    Button("Save Gain & Subtitle Defaults", systemImage: "square.and.arrow.down") {
+                        saveDefaults()
+                        defaultsSaved = true
+                    }
+                    if defaultsSaved {
+                        Label("Defaults saved", systemImage: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    }
+                }
+                Text("Future sources will reuse the gain setting and either automatic subtitle recommendations or Omit subtitles. Specific tracks and color confirmations are never reused.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 if !plan.warnings.isEmpty {
                     Divider()
                     ForEach(plan.warnings, id: \.self) { warning in
@@ -101,6 +119,8 @@ struct ConversionPlanView: View {
                 .font(.headline)
         }
         .frame(maxWidth: 760)
+        .onChange(of: gainEnabled) { _, _ in defaultsSaved = false }
+        .onChange(of: subtitleSelection) { _, _ in defaultsSaved = false }
     }
 
     private func planRow(_ label: String, _ value: String) -> some View {
