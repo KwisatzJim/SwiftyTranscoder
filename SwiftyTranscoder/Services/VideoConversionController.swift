@@ -4,6 +4,7 @@ import Foundation
 final class VideoConversionController: ObservableObject {
     @Published private(set) var phase: Phase = .idle
     @Published private(set) var progress = 0.0
+    @Published private(set) var estimatedRemainingSeconds: TimeInterval?
 
     private var process: Process?
     private var activeCommand: VideoConversionCommand?
@@ -12,6 +13,7 @@ final class VideoConversionController: ObservableObject {
     private var expectedVideoMode: VideoConversionMode?
     private var colorSelection: ColorSelection?
     private var expectedDurationSeconds: Double?
+    private var conversionStartedAt: Date?
     private var cancellationRequested = false
     private let diagnostics = LockedTextBuffer()
 
@@ -47,7 +49,7 @@ final class VideoConversionController: ObservableObject {
         let errorPipe = Pipe()
         let parser = FFmpegProgressParser(durationSeconds: durationSeconds) { [weak self] value in
             Task { @MainActor in
-                self?.progress = value
+                self?.updateProgress(value)
             }
         }
 
@@ -66,6 +68,8 @@ final class VideoConversionController: ObservableObject {
         expectedDurationSeconds = durationSeconds
         self.process = process
         progress = 0
+        estimatedRemainingSeconds = nil
+        conversionStartedAt = Date()
         phase = .running
 
         progressPipe.fileHandleForReading.readabilityHandler = { handle in
@@ -95,6 +99,8 @@ final class VideoConversionController: ObservableObject {
             self.expectedVideoMode = nil
             self.colorSelection = nil
             expectedDurationSeconds = nil
+            conversionStartedAt = nil
+            estimatedRemainingSeconds = nil
             phase = .failed("Could not start FFmpeg: \(error.localizedDescription)", partialOutput: nil)
         }
     }
@@ -110,6 +116,8 @@ final class VideoConversionController: ObservableObject {
         guard !isActive else { return }
         phase = .idle
         progress = 0
+        estimatedRemainingSeconds = nil
+        conversionStartedAt = nil
     }
 
     func movePartialOutputToTrash(_ detectedPartialOutputURL: URL? = nil) throws {
@@ -151,6 +159,8 @@ final class VideoConversionController: ObservableObject {
         self.expectedVideoMode = nil
         self.colorSelection = nil
         self.expectedDurationSeconds = nil
+        conversionStartedAt = nil
+        estimatedRemainingSeconds = nil
 
         if cancellationRequested {
             phase = .cancelled(partialOutput: existingPartialURL(command.partialOutputURL))
@@ -200,6 +210,30 @@ final class VideoConversionController: ObservableObject {
                 "Output validation failed: \(error.localizedDescription)",
                 partialOutput: existingPartialURL(command.partialOutputURL)
             )
+        }
+    }
+
+    private func updateProgress(_ value: Double) {
+        progress = value
+
+        guard let conversionStartedAt,
+              value >= 0.01,
+              value < 1 else {
+            estimatedRemainingSeconds = nil
+            return
+        }
+
+        let elapsed = Date().timeIntervalSince(conversionStartedAt)
+        guard elapsed >= 2 else {
+            estimatedRemainingSeconds = nil
+            return
+        }
+
+        let newEstimate = elapsed * (1 - value) / value
+        if let currentEstimate = estimatedRemainingSeconds {
+            estimatedRemainingSeconds = currentEstimate * 0.75 + newEstimate * 0.25
+        } else {
+            estimatedRemainingSeconds = newEstimate
         }
     }
 

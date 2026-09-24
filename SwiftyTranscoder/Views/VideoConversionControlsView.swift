@@ -5,6 +5,7 @@ struct VideoConversionControlsView: View {
     let canStart: Bool
     let existingPartialOutput: URL?
     let start: () -> Void
+    let advanceToNext: (() -> Void)?
     @State private var partialPendingTrash: URL?
     @State private var trashError: String?
 
@@ -29,8 +30,14 @@ struct VideoConversionControlsView: View {
                 }
 
             case .running:
-                ProgressView(value: controller.progress) {
-                    Text("Encoding approved plan… \(controller.progress.formatted(.percent.precision(.fractionLength(0))))")
+                VStack(spacing: 4) {
+                    HStack {
+                        Text("Encoding approved plan… \(controller.progress.formatted(.percent.precision(.fractionLength(0))))")
+                        Spacer()
+                        Text(progressStatus)
+                            .foregroundStyle(.secondary)
+                    }
+                    ProgressView(value: controller.progress)
                 }
                 Button("Cancel", role: .cancel) { controller.cancel() }
 
@@ -43,6 +50,10 @@ struct VideoConversionControlsView: View {
                 Text(output.path(percentEncoded: false))
                     .font(.caption)
                     .textSelection(.enabled)
+                if let advanceToNext {
+                    Button("Review Next Video", systemImage: "arrow.right", action: advanceToNext)
+                        .buttonStyle(.borderedProminent)
+                }
 
             case .cancelled(let partialOutput):
                 statusMessage(
@@ -94,6 +105,27 @@ struct VideoConversionControlsView: View {
         } message: {
             Text(trashError ?? "Unknown error")
         }
+    }
+
+    private var progressStatus: String {
+        if controller.progress >= 0.999 {
+            return "Finalizing…"
+        }
+        guard let remaining = controller.estimatedRemainingSeconds else {
+            return "ETA calculating…"
+        }
+        return "ETA \(formattedDuration(remaining))"
+    }
+
+    private func formattedDuration(_ interval: TimeInterval) -> String {
+        let totalSeconds = max(0, Int(interval.rounded()))
+        let hours = totalSeconds / 3_600
+        let minutes = (totalSeconds % 3_600) / 60
+        let seconds = totalSeconds % 60
+
+        if hours > 0 { return "\(hours)h\(minutes)m" }
+        if minutes > 0 { return "\(minutes)m\(seconds)s" }
+        return "\(seconds)s"
     }
 
     private func statusMessage(

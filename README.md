@@ -64,13 +64,14 @@ The script refuses to replace an existing DMG for the current version. To delibe
 
 ## Workflow
 
-1. Choose one MKV.
-2. Review the human-readable media summary and proposed conversion.
+1. Choose one or more MKV/MP4 sources.
+2. Review the current file's human-readable media summary and proposed conversion.
 3. Resolve any required color or subtitle decision.
 4. Choose an output folder and review the storage preflight.
 5. Turn protected +6 dB gain on or off.
 6. Start the approved plan.
 7. Inspect or play the validated final MP4 before removing the source.
+8. For a multi-file queue, review and approve the next waiting source.
 
 SwiftyTranscoder never deletes or modifies the source MKV.
 
@@ -78,7 +79,7 @@ SwiftyTranscoder never deletes or modifies the source MKV.
 
 | Area | Supported behavior |
 | --- | --- |
-| Source container | Matroska/MKV or compatible MP4/M4V, one job at a time |
+| Source container | Matroska/MKV or compatible MP4/M4V; multiple sources may be queued and reviewed sequentially |
 | Source video | H.264 or HEVC; `yuv420p` or `yuv420p10le`; confirmed SDR or explicitly user-confirmed untagged SDR |
 | Output video | HEVC Main/Main10 in MP4, `hvc1`, VideoToolbox hardware only |
 | MP4 video behavior | Copy compatible H.264/HEVC video unchanged when only audio is processed |
@@ -96,7 +97,8 @@ SwiftyTranscoder never deletes or modifies the source MKV.
 - PGS/VobSub burn-in and subtitle OCR are not implemented.
 - Selectable MP4 subtitle output is not implemented; supported subtitles are either burned in or omitted.
 - MP4/M4V audio-only processing cannot burn subtitles because that would require video re-encoding.
-- Batch queues, automatic crop detection, restoration filters, AI upscaling, and broad encoder controls are deferred.
+- Queue advancement remains user-approved; unattended batch conversion is not implemented.
+- Automatic crop detection, restoration filters, AI upscaling, and broad encoder controls are deferred.
 - The app currently depends on separately installed Homebrew tools and is not yet a self-contained distributable build.
 
 ## Plex validation

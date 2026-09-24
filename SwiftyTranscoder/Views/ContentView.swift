@@ -4,6 +4,8 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @StateObject private var conversionController = VideoConversionController()
     @State private var isChoosingSource = false
+    @State private var sourceQueue: [URL] = []
+    @State private var currentQueueIndex = 0
     @State private var selectedSource: URL?
     @State private var inspection: MediaInspection?
     @State private var isInspecting = false
@@ -37,16 +39,20 @@ struct ContentView: View {
             }
             .multilineTextAlignment(.center)
 
+            if sourceQueue.count > 1 {
+                sourceQueueView
+            }
+
             if let selectedSource {
                 selectedFileView(selectedSource)
             } else {
-                Text("Choose one MKV or MP4 file to begin. The source will only be read.")
+                Text("Choose one or more MKV or MP4 files to begin. Sources will only be read.")
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 420)
             }
 
-                Button("Choose Video…", systemImage: "folder") {
+                Button("Choose Videos…", systemImage: "folder") {
                     isChoosingSource = true
                 }
                 .buttonStyle(.borderedProminent)
@@ -59,7 +65,7 @@ struct ContentView: View {
         .fileImporter(
             isPresented: $isChoosingSource,
             allowedContentTypes: Self.sourceTypes,
-            allowsMultipleSelection: false
+            allowsMultipleSelection: true
         ) { result in
             handleSelection(result)
         }
@@ -74,6 +80,62 @@ struct ContentView: View {
         } message: {
             Text(selectionError ?? "The file could not be selected.")
         }
+    }
+
+    private var sourceQueueView: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(Array(sourceQueue.enumerated()), id: \.offset) { index, source in
+                    HStack(spacing: 8) {
+                        Image(systemName: queueIcon(for: index))
+                            .foregroundStyle(queueColor(for: index))
+                        Text(source.lastPathComponent)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer(minLength: 8)
+                        Text(queueStatus(for: index))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .font(index == currentQueueIndex ? .body.weight(.semibold) : .body)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            Label(
+                "Source queue · \(completedQueueCount) of \(sourceQueue.count) completed",
+                systemImage: "list.number"
+            )
+                .font(.headline)
+        }
+        .frame(maxWidth: 760)
+    }
+
+    private func queueIcon(for index: Int) -> String {
+        if isCompletedQueueItem(index) { return "checkmark.circle.fill" }
+        if index == currentQueueIndex { return "play.circle.fill" }
+        return "circle"
+    }
+
+    private func queueColor(for index: Int) -> Color {
+        if isCompletedQueueItem(index) { return .green }
+        if index == currentQueueIndex { return .accentColor }
+        return .secondary
+    }
+
+    private func queueStatus(for index: Int) -> String {
+        if isCompletedQueueItem(index) { return "Completed" }
+        if index == currentQueueIndex { return "Current" }
+        return "Waiting"
+    }
+
+    private var completedQueueCount: Int {
+        currentQueueIndex + (conversionController.completedOutputURL == nil ? 0 : 1)
+    }
+
+    private func isCompletedQueueItem(_ index: Int) -> Bool {
+        index < currentQueueIndex
+            || (index == currentQueueIndex && conversionController.completedOutputURL != nil)
     }
 
     private func selectedFileView(_ url: URL) -> some View {
@@ -132,7 +194,8 @@ struct ContentView: View {
                 controller: conversionController,
                 canStart: canStartVideoConversion(inspection: inspection),
                 existingPartialOutput: existingPartialOutput,
-                start: { startVideoConversion(sourceURL: sourceURL, inspection: inspection) }
+                start: { startVideoConversion(sourceURL: sourceURL, inspection: inspection) },
+                advanceToNext: advanceToNextAction
             )
 
             TechnicalInspectionView(inspection: inspection)
@@ -146,36 +209,61 @@ struct ContentView: View {
     private func handleSelection(_ result: Result<[URL], any Error>) {
         switch result {
         case .success(let urls):
-            guard let source = urls.first else {
+            guard !urls.isEmpty else {
                 selectionError = "No file was returned by the file picker."
                 return
             }
 
-            let sourceExtension = source.pathExtension.lowercased()
-            guard ["mkv", "mp4", "m4v"].contains(sourceExtension) else {
-                selectionError = "\(source.lastPathComponent) is not an MKV or MP4 file."
+            let supportedSources = urls.filter {
+                ["mkv", "mp4", "m4v"].contains($0.pathExtension.lowercased())
+            }
+            guard supportedSources.count == urls.count else {
+                selectionError = "Every selected source must be an MKV or MP4 file."
                 return
             }
 
-            conversionController.reset()
-            selectedSource = source
-            inspection = nil
-            gainEnabled = true
-            colorSelection = .needsConfirmation
-            subtitleSelection = .needsChoice
-            outputURL = nil
-            if let savedFolder = validSavedOutputFolder {
-                outputURL = OutputNaming.proposedURL(
-                    sourceURL: source,
-                    folderURL: savedFolder
-                )
-            }
-            selectionError = nil
-            inspect(source)
+            sourceQueue = supportedSources
+            currentQueueIndex = 0
+            guard let source = sourceQueue.first else { return }
+            loadSource(source)
 
         case .failure(let error):
             selectionError = error.localizedDescription
         }
+    }
+
+    private var hasNextQueuedSource: Bool {
+        currentQueueIndex + 1 < sourceQueue.count
+    }
+
+    private var advanceToNextAction: (() -> Void)? {
+        guard hasNextQueuedSource else { return nil }
+        return { advanceToNextSource() }
+    }
+
+    private func advanceToNextSource() {
+        guard conversionController.completedOutputURL != nil,
+              hasNextQueuedSource else { return }
+        currentQueueIndex += 1
+        loadSource(sourceQueue[currentQueueIndex])
+    }
+
+    private func loadSource(_ source: URL) {
+        conversionController.reset()
+        selectedSource = source
+        inspection = nil
+        gainEnabled = true
+        colorSelection = .needsConfirmation
+        subtitleSelection = .needsChoice
+        outputURL = nil
+        if let savedFolder = validSavedOutputFolder {
+            outputURL = OutputNaming.proposedURL(
+                sourceURL: source,
+                folderURL: savedFolder
+            )
+        }
+        selectionError = nil
+        inspect(source)
     }
 
     private var validSavedOutputFolder: URL? {
