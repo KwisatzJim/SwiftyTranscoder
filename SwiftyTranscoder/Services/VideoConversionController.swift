@@ -14,6 +14,7 @@ final class VideoConversionController: ObservableObject {
     private var colorSelection: ColorSelection?
     private var expectedDurationSeconds: Double?
     private var conversionStartedAt: Date?
+    private var systemActivity: NSObjectProtocol?
     private var cancellationRequested = false
     private let diagnostics = LockedTextBuffer()
 
@@ -32,6 +33,10 @@ final class VideoConversionController: ObservableObject {
     var managedPartialOutputURL: URL? {
         guard isActive else { return nil }
         return activeCommand?.partialOutputURL
+    }
+
+    var isPreventingIdleSystemSleep: Bool {
+        systemActivity != nil
     }
 
     func start(
@@ -70,6 +75,7 @@ final class VideoConversionController: ObservableObject {
         progress = 0
         estimatedRemainingSeconds = nil
         conversionStartedAt = Date()
+        beginSystemActivity()
         phase = .running
 
         progressPipe.fileHandleForReading.readabilityHandler = { handle in
@@ -101,6 +107,7 @@ final class VideoConversionController: ObservableObject {
             expectedDurationSeconds = nil
             conversionStartedAt = nil
             estimatedRemainingSeconds = nil
+            endSystemActivity()
             phase = .failed("Could not start FFmpeg: \(error.localizedDescription)", partialOutput: nil)
         }
     }
@@ -147,6 +154,7 @@ final class VideoConversionController: ObservableObject {
 
     private func finish(exitCode: Int32) async {
         guard let command = activeCommand else { return }
+        defer { endSystemActivity() }
         let expectedVideo = self.expectedVideo
         let expectedAudio = self.expectedAudio
         let expectedVideoMode = self.expectedVideoMode
@@ -236,6 +244,20 @@ final class VideoConversionController: ObservableObject {
         } else {
             estimatedRemainingSeconds = newEstimate
         }
+    }
+
+    private func beginSystemActivity() {
+        guard systemActivity == nil else { return }
+        systemActivity = ProcessInfo.processInfo.beginActivity(
+            options: [.userInitiated, .idleSystemSleepDisabled],
+            reason: "SwiftyTranscoder is converting video"
+        )
+    }
+
+    private func endSystemActivity() {
+        guard let systemActivity else { return }
+        ProcessInfo.processInfo.endActivity(systemActivity)
+        self.systemActivity = nil
     }
 
     private func validate(

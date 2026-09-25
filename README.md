@@ -75,6 +75,8 @@ The script refuses to replace an existing DMG for the current version. To delibe
 
 SwiftyTranscoder never deletes or modifies the source MKV.
 
+While FFmpeg is converting, SwiftyTranscoder asks macOS to prevent automatic idle system sleep. The request ends after completion, cancellation, or failure; it does not block manually selected sleep or closing a MacBook lid.
+
 The conversion plan can remember gain and subtitle-policy defaults across sources and app launches. Specific subtitle stream numbers and color confirmations are always source-specific and are never reused.
 
 ## Supported version-1 path

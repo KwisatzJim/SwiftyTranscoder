@@ -40,6 +40,11 @@ struct VideoConversionControlsView: View {
                     ProgressView(value: controller.progress)
                 }
                 Button("Cancel", role: .cancel) { controller.cancel() }
+                if controller.isPreventingIdleSystemSleep {
+                    Label("Keeping this Mac awake until conversion stops", systemImage: "moon.zzz")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
             case .cancelling:
                 ProgressView("Stopping safely…")
