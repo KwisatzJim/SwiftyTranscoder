@@ -81,6 +81,8 @@ While FFmpeg is converting, SwiftyTranscoder asks macOS to prevent automatic idl
 
 During a batch, the running display shows the current video's position and per-video ETA alongside a separate overall batch progress bar.
 
+Before a reviewed batch can start, SwiftyTranscoder adds the conservative requirements for all approved outputs on each destination volume and blocks the batch if the combined requirement cannot be satisfied.
+
 Multi-file queues can optionally send a macOS notification when the batch completes, fails, or is cancelled. This is off by default and requires SwiftyTranscoder to be allowed in **System Settings → Notifications**.
 
 The conversion plan can remember gain and subtitle-policy defaults across sources and app launches. Specific subtitle stream numbers and color confirmations are always source-specific and are never reused.

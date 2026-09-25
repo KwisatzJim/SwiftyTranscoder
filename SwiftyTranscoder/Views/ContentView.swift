@@ -251,7 +251,8 @@ struct ContentView: View {
 
             VideoConversionControlsView(
                 controller: conversionController,
-                canStart: canStartVideoConversion(inspection: inspection),
+                canStart: canStartVideoConversion(inspection: inspection)
+                    && (!isBatchReady || batchHasSufficientSpace),
                 startButtonTitle: startButtonTitle,
                 batchItemNumber: isBatchRunning ? currentQueueIndex + 1 : nil,
                 batchItemCount: sourceQueue.count,
@@ -313,6 +314,24 @@ struct ContentView: View {
                 Text("Select any queue row to review it. Start the batch when you are ready, or reopen the selected plan to change it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Divider()
+                if let checks = batchDestinationSpaceChecks {
+                    ForEach(checks) { check in
+                        Label(
+                            "\(check.volumeName): \(DestinationSpaceCheck.format(check.availableBytes)) available; \(DestinationSpaceCheck.format(check.requiredBytes)) required for this batch",
+                            systemImage: check.isSufficient ? "externaldrive.fill.badge.checkmark" : "externaldrive.fill.badge.exclamationmark"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(check.isSufficient ? Color.secondary : Color.orange)
+                    }
+                } else {
+                    Label(
+                        "Batch destination space could not be verified. Batch start is blocked.",
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                }
                 Button("Reopen Selected Plan", systemImage: "pencil") {
                     approvedPlans.removeValue(forKey: currentQueueIndex)
                     isBatchReady = false
@@ -513,10 +532,56 @@ struct ContentView: View {
             selectionError = "Every queued video must have an approved plan before the batch can start."
             return
         }
+        guard batchHasSufficientSpace else {
+            selectionError = "The approved batch requires more destination space than is currently available."
+            return
+        }
         completedQueueIndexes = []
         isBatchReady = false
         isBatchRunning = true
         startApprovedConversion(at: 0)
+    }
+
+    private var batchHasSufficientSpace: Bool {
+        batchDestinationSpaceChecks?.allSatisfy(\.isSufficient) == true
+    }
+
+    private var batchDestinationSpaceChecks: [BatchDestinationSpaceCheck]? {
+        guard approvedPlans.count == sourceQueue.count else { return nil }
+        var checksByVolume: [String: BatchDestinationSpaceCheck] = [:]
+
+        for approved in approvedPlans.values {
+            guard let itemCheck = DestinationSpaceCheck.evaluate(
+                inspection: approved.inspection,
+                outputURL: approved.outputURL
+            ) else { return nil }
+            let folderURL = approved.outputURL.deletingLastPathComponent()
+            guard let values = try? folderURL.resourceValues(
+                forKeys: [.volumeIdentifierKey, .volumeNameKey]
+            ), let identifier = values.volumeIdentifier else { return nil }
+            let key = String(describing: identifier)
+            let volumeName = values.volumeName ?? folderURL.path(percentEncoded: false)
+
+            if let existing = checksByVolume[key] {
+                let total = existing.requiredBytes.addingReportingOverflow(itemCheck.requiredBytes)
+                guard !total.overflow else { return nil }
+                checksByVolume[key] = BatchDestinationSpaceCheck(
+                    id: key,
+                    volumeName: volumeName,
+                    availableBytes: min(existing.availableBytes, itemCheck.availableBytes),
+                    requiredBytes: total.partialValue
+                )
+            } else {
+                checksByVolume[key] = BatchDestinationSpaceCheck(
+                    id: key,
+                    volumeName: volumeName,
+                    availableBytes: itemCheck.availableBytes,
+                    requiredBytes: itemCheck.requiredBytes
+                )
+            }
+        }
+
+        return checksByVolume.values.sorted { $0.volumeName < $1.volumeName }
     }
 
     private func startApprovedConversion(at index: Int) {
@@ -622,4 +687,13 @@ private struct ApprovedConversion {
     let aacStereoEnabled: Bool
     let colorSelection: ColorSelection
     let subtitleSelection: SubtitleSelection
+}
+
+private struct BatchDestinationSpaceCheck: Identifiable {
+    let id: String
+    let volumeName: String
+    let availableBytes: Int64
+    let requiredBytes: Int64
+
+    var isSufficient: Bool { availableBytes >= requiredBytes }
 }
