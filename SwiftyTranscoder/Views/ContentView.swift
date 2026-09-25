@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var inspection: MediaInspection?
     @State private var isInspecting = false
     @State private var selectionError: String?
+    @State private var notificationError: String?
     @State private var gainEnabled = true
     @State private var aacStereoEnabled = false
     @State private var colorSelection = ColorSelection.needsConfirmation
@@ -21,6 +22,7 @@ struct ContentView: View {
     @AppStorage("savedOutputFolderPath") private var savedOutputFolderPath = ""
     @AppStorage("defaultGainEnabled") private var defaultGainEnabled = true
     @AppStorage("defaultSubtitleMode") private var defaultSubtitleMode = "recommended"
+    @AppStorage("batchNotificationsEnabled") private var batchNotificationsEnabled = false
 
     private static let sourceTypes: [UTType] = [
         UTType(filenameExtension: "mkv") ?? .data,
@@ -86,6 +88,17 @@ struct ContentView: View {
         } message: {
             Text(selectionError ?? "The file could not be selected.")
         }
+        .alert(
+            "Batch Notifications Unavailable",
+            isPresented: Binding(
+                get: { notificationError != nil },
+                set: { if !$0 { notificationError = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(notificationError ?? "Notifications could not be enabled.")
+        }
         .onChange(of: conversionController.phase) { _, phase in
             handleConversionPhaseChange(phase)
         }
@@ -108,6 +121,15 @@ struct ContentView: View {
                     }
                     .font(index == currentQueueIndex ? .body.weight(.semibold) : .body)
                 }
+                Divider()
+                Toggle(
+                    "Notify when this batch finishes or stops",
+                    isOn: Binding(
+                        get: { batchNotificationsEnabled },
+                        set: setBatchNotificationsEnabled
+                    )
+                )
+                .disabled(isBatchRunning)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         } label: {
@@ -428,6 +450,10 @@ struct ContentView: View {
         guard let approved = approvedPlans[index] else {
             isBatchRunning = false
             selectionError = "The approved plan for video \(index + 1) is unavailable."
+            sendBatchNotification(
+                title: "SwiftyTranscoder Batch Stopped",
+                body: "The approved plan for video \(index + 1) was unavailable."
+            )
             return
         }
         currentQueueIndex = index
@@ -442,6 +468,10 @@ struct ContentView: View {
         startVideoConversion(sourceURL: approved.sourceURL, inspection: approved.inspection)
         if !conversionController.isActive {
             isBatchRunning = false
+            sendBatchNotification(
+                title: "SwiftyTranscoder Batch Stopped",
+                body: "Conversion could not start for \(approved.sourceURL.lastPathComponent)."
+            )
         }
     }
 
@@ -453,16 +483,60 @@ struct ContentView: View {
             let nextIndex = currentQueueIndex + 1
             guard nextIndex < sourceQueue.count else {
                 isBatchRunning = false
+                sendBatchNotification(
+                    title: "SwiftyTranscoder Batch Complete",
+                    body: "Successfully converted \(sourceQueue.count) videos."
+                )
                 return
             }
             Task { @MainActor in
                 await Task.yield()
                 startApprovedConversion(at: nextIndex)
             }
-        case .failed, .cancelled:
+        case .failed:
             isBatchRunning = false
+            sendBatchNotification(
+                title: "SwiftyTranscoder Batch Stopped",
+                body: "Conversion failed for \(sourceQueue[currentQueueIndex].lastPathComponent)."
+            )
+        case .cancelled:
+            isBatchRunning = false
+            sendBatchNotification(
+                title: "SwiftyTranscoder Batch Cancelled",
+                body: "Stopped at \(sourceQueue[currentQueueIndex].lastPathComponent)."
+            )
         default:
             break
+        }
+    }
+
+    private func setBatchNotificationsEnabled(_ enabled: Bool) {
+        guard enabled else {
+            batchNotificationsEnabled = false
+            return
+        }
+        Task { @MainActor in
+            do {
+                let granted = try await BatchNotificationService.requestAuthorization()
+                batchNotificationsEnabled = granted
+                if !granted {
+                    notificationError = "Notifications were not allowed. You can change this in System Settings."
+                }
+            } catch {
+                batchNotificationsEnabled = false
+                notificationError = error.localizedDescription
+            }
+        }
+    }
+
+    private func sendBatchNotification(title: String, body: String) {
+        guard batchNotificationsEnabled else { return }
+        Task { @MainActor in
+            do {
+                try await BatchNotificationService.send(title: title, body: body)
+            } catch {
+                notificationError = error.localizedDescription
+            }
         }
     }
 }
