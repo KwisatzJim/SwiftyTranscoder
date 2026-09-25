@@ -8,6 +8,7 @@ struct ConversionPlanView: View {
     let subtitleStreams: [MediaStream]
     let sourceDynamicRange: String?
     @Binding var gainEnabled: Bool
+    @Binding var aacStereoEnabled: Bool
     @Binding var colorSelection: ColorSelection
     @Binding var subtitleSelection: SubtitleSelection
     @Binding var outputURL: URL?
@@ -52,6 +53,14 @@ struct ConversionPlanView: View {
                     }
                     .font(.callout)
                     GridRow {
+                        Text("Extra audio")
+                            .foregroundStyle(.secondary)
+                        Toggle("Add AAC stereo compatibility track", isOn: $aacStereoEnabled)
+                            .toggleStyle(.switch)
+                            .gridColumnAlignment(.leading)
+                    }
+                    .font(.callout)
+                    GridRow {
                         Text("Subtitles")
                             .foregroundStyle(.secondary)
                         Picker("Subtitles", selection: $subtitleSelection) {
@@ -86,6 +95,15 @@ struct ConversionPlanView: View {
                         .gridColumnAlignment(.leading)
                     }
                     .font(.callout)
+                }
+
+                if aacStereoEnabled {
+                    Label(
+                        "AC-3 remains the default primary track; AAC stereo will be added as a secondary compatibility track.",
+                        systemImage: "info.circle.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
 
                 Divider()

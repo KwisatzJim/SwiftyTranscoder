@@ -187,6 +187,7 @@ final class VideoConversionController: ObservableObject {
                 expectedVideo: expectedVideo,
                 expectedAudio: expectedAudio,
                 videoMode: expectedVideoMode,
+                includesAACStereoTrack: command.includesAACStereoTrack,
                 colorSelection: colorSelection,
                 expectedDurationSeconds: expectedDurationSeconds
             )
@@ -242,6 +243,7 @@ final class VideoConversionController: ObservableObject {
         expectedVideo: MediaStream,
         expectedAudio: MediaStream,
         videoMode: VideoConversionMode,
+        includesAACStereoTrack: Bool,
         colorSelection: ColorSelection,
         expectedDurationSeconds: Double
     ) throws {
@@ -290,9 +292,11 @@ final class VideoConversionController: ObservableObject {
                 actual: outputVideo.averageFrameRate ?? "unknown"
             )
         }
-        guard inspection.audioStreams.count == 1,
+        let expectedAudioStreamCount = includesAACStereoTrack ? 2 : 1
+        guard inspection.audioStreams.count == expectedAudioStreamCount,
               let outputAudio = inspection.audioStreams.first else {
             throw VideoConversionControllerError.invalidAudioStreamCount(
+                expected: expectedAudioStreamCount,
                 count: inspection.audioStreams.count
             )
         }
@@ -312,6 +316,36 @@ final class VideoConversionController: ObservableObject {
                 sampleRate: outputAudio.sampleRate ?? "unknown",
                 bitRate: outputAudio.bitRate ?? "unknown"
             )
+        }
+        let expectedLanguage = expectedAudio.tags?["language"] ?? "und"
+        guard (outputAudio.tags?["language"] ?? "und") == expectedLanguage,
+              outputAudio.disposition?.isDefault == 1 else {
+            throw VideoConversionControllerError.invalidAudioMetadata(
+                track: "primary AC-3"
+            )
+        }
+        if includesAACStereoTrack {
+            let secondaryAudio = inspection.audioStreams[1]
+            let secondaryBitRate = secondaryAudio.bitRate.flatMap(Int.init) ?? 0
+            guard secondaryAudio.codecName == "aac",
+                  secondaryAudio.codecTagString == "mp4a",
+                  secondaryAudio.channels == 2,
+                  secondaryAudio.channelLayout == "stereo",
+                  secondaryAudio.sampleRate == "48000",
+                  (180_000...205_000).contains(secondaryBitRate) else {
+                throw VideoConversionControllerError.invalidSecondaryAudio(
+                    codec: secondaryAudio.codecName ?? "unknown",
+                    layout: secondaryAudio.channelLayout ?? "unknown",
+                    sampleRate: secondaryAudio.sampleRate ?? "unknown",
+                    bitRate: secondaryAudio.bitRate ?? "unknown"
+                )
+            }
+            guard (secondaryAudio.tags?["language"] ?? "und") == expectedLanguage,
+                  secondaryAudio.disposition?.isDefault != 1 else {
+                throw VideoConversionControllerError.invalidAudioMetadata(
+                    track: "secondary AAC stereo"
+                )
+            }
         }
         guard inspection.subtitleStreams.isEmpty else {
             throw VideoConversionControllerError.unexpectedSubtitles
@@ -412,8 +446,10 @@ enum VideoConversionControllerError: LocalizedError {
         actualPixelFormat: String
     )
     case changedColorMetadata
-    case invalidAudioStreamCount(count: Int)
+    case invalidAudioStreamCount(expected: Int, count: Int)
     case invalidAudio(expected: String, codec: String, layout: String, sampleRate: String, bitRate: String)
+    case invalidSecondaryAudio(codec: String, layout: String, sampleRate: String, bitRate: String)
+    case invalidAudioMetadata(track: String)
     case changedAudioChannels
     case changedDuration(expected: Double, actual: Double?)
     case changedDimensions
@@ -438,10 +474,14 @@ enum VideoConversionControllerError: LocalizedError {
             "Expected \(expectedProfile) \(expectedPixelFormat), but found \(actualProfile) \(actualPixelFormat)."
         case .changedColorMetadata:
             "The output color metadata does not match the approved source metadata."
-        case .invalidAudioStreamCount(let count):
-            "Expected one output audio stream but found \(count)."
+        case .invalidAudioStreamCount(let expected, let count):
+            "Expected \(expected) output audio stream(s) but found \(count)."
         case .invalidAudio(let expected, let codec, let layout, let sampleRate, let bitRate):
             "Expected AC-3 \(expected) at 48000 Hz but found \(codec), \(layout), \(sampleRate) Hz, \(bitRate) b/s."
+        case .invalidSecondaryAudio(let codec, let layout, let sampleRate, let bitRate):
+            "Expected secondary AAC stereo near 192 kb/s at 48000 Hz but found \(codec), \(layout), \(sampleRate) Hz, \(bitRate) b/s."
+        case .invalidAudioMetadata(let track):
+            "The \(track) language or default-track setting does not match the approved plan."
         case .changedAudioChannels:
             "The approved source uses an unsupported audio channel layout."
         case .changedDuration(let expected, let actual):

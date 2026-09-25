@@ -3,9 +3,9 @@ import SwiftUI
 struct VideoConversionControlsView: View {
     @ObservedObject var controller: VideoConversionController
     let canStart: Bool
+    let startButtonTitle: String
     let existingPartialOutput: URL?
     let start: () -> Void
-    let advanceToNext: (() -> Void)?
     @State private var partialPendingTrash: URL?
     @State private var trashError: String?
 
@@ -13,7 +13,7 @@ struct VideoConversionControlsView: View {
         VStack(spacing: 8) {
             switch controller.phase {
             case .idle:
-                Button("Convert Approved Plan", systemImage: "play.fill", action: start)
+                Button(startButtonTitle, systemImage: "checkmark.circle", action: start)
                     .buttonStyle(.borderedProminent)
                     .disabled(!canStart)
                 if let existingPartialOutput {
@@ -50,10 +50,6 @@ struct VideoConversionControlsView: View {
                 Text(output.path(percentEncoded: false))
                     .font(.caption)
                     .textSelection(.enabled)
-                if let advanceToNext {
-                    Button("Review Next Video", systemImage: "arrow.right", action: advanceToNext)
-                        .buttonStyle(.borderedProminent)
-                }
 
             case .cancelled(let partialOutput):
                 statusMessage(

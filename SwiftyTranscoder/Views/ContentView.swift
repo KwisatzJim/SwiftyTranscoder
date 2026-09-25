@@ -6,11 +6,15 @@ struct ContentView: View {
     @State private var isChoosingSource = false
     @State private var sourceQueue: [URL] = []
     @State private var currentQueueIndex = 0
+    @State private var approvedPlans: [Int: ApprovedConversion] = [:]
+    @State private var completedQueueIndexes: Set<Int> = []
+    @State private var isBatchRunning = false
     @State private var selectedSource: URL?
     @State private var inspection: MediaInspection?
     @State private var isInspecting = false
     @State private var selectionError: String?
     @State private var gainEnabled = true
+    @State private var aacStereoEnabled = false
     @State private var colorSelection = ColorSelection.needsConfirmation
     @State private var subtitleSelection = SubtitleSelection.needsChoice
     @State private var outputURL: URL?
@@ -58,7 +62,7 @@ struct ContentView: View {
                     isChoosingSource = true
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(isInspecting || conversionController.isActive)
+                .disabled(isInspecting || conversionController.isActive || isBatchRunning)
             }
             .padding(32)
             .frame(maxWidth: .infinity)
@@ -81,6 +85,9 @@ struct ContentView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(selectionError ?? "The file could not be selected.")
+        }
+        .onChange(of: conversionController.phase) { _, phase in
+            handleConversionPhaseChange(phase)
         }
     }
 
@@ -115,29 +122,32 @@ struct ContentView: View {
 
     private func queueIcon(for index: Int) -> String {
         if isCompletedQueueItem(index) { return "checkmark.circle.fill" }
+        if approvedPlans[index] != nil && index != currentQueueIndex { return "checkmark.circle" }
         if index == currentQueueIndex { return "play.circle.fill" }
         return "circle"
     }
 
     private func queueColor(for index: Int) -> Color {
         if isCompletedQueueItem(index) { return .green }
+        if approvedPlans[index] != nil && index != currentQueueIndex { return .blue }
         if index == currentQueueIndex { return .accentColor }
         return .secondary
     }
 
     private func queueStatus(for index: Int) -> String {
         if isCompletedQueueItem(index) { return "Completed" }
-        if index == currentQueueIndex { return "Current" }
+        if isBatchRunning && index == currentQueueIndex { return "Converting" }
+        if approvedPlans[index] != nil { return "Approved" }
+        if index == currentQueueIndex { return "Reviewing" }
         return "Waiting"
     }
 
     private var completedQueueCount: Int {
-        currentQueueIndex + (conversionController.completedOutputURL == nil ? 0 : 1)
+        completedQueueIndexes.count
     }
 
     private func isCompletedQueueItem(_ index: Int) -> Bool {
-        index < currentQueueIndex
-            || (index == currentQueueIndex && conversionController.completedOutputURL != nil)
+        completedQueueIndexes.contains(index)
     }
 
     private func selectedFileView(_ url: URL) -> some View {
@@ -176,6 +186,7 @@ struct ContentView: View {
                 plan: ConversionPlan(
                     inspection: inspection,
                     gainEnabled: gainEnabled,
+                    aacStereoEnabled: aacStereoEnabled,
                     colorSelection: colorSelection,
                     subtitleSelection: subtitleSelection,
                     outputURL: outputURL,
@@ -186,19 +197,21 @@ struct ContentView: View {
                 subtitleStreams: inspection.subtitleStreams,
                 sourceDynamicRange: MediaSummary(inspection: inspection).video?.dynamicRange,
                 gainEnabled: $gainEnabled,
+                aacStereoEnabled: $aacStereoEnabled,
                 colorSelection: $colorSelection,
                 subtitleSelection: $subtitleSelection,
                 outputURL: $outputURL,
                 savedOutputFolderPath: $savedOutputFolderPath,
                 saveDefaults: saveCurrentDefaults
             )
+            .disabled(isBatchRunning)
 
             VideoConversionControlsView(
                 controller: conversionController,
                 canStart: canStartVideoConversion(inspection: inspection),
+                startButtonTitle: startButtonTitle,
                 existingPartialOutput: existingPartialOutput,
-                start: { startVideoConversion(sourceURL: sourceURL, inspection: inspection) },
-                advanceToNext: advanceToNextAction
+                start: { approveOrStart(sourceURL: sourceURL, inspection: inspection) }
             )
 
             TechnicalInspectionView(inspection: inspection)
@@ -227,6 +240,9 @@ struct ContentView: View {
 
             sourceQueue = supportedSources
             currentQueueIndex = 0
+            approvedPlans = [:]
+            completedQueueIndexes = []
+            isBatchRunning = false
             guard let source = sourceQueue.first else { return }
             loadSource(source)
 
@@ -235,20 +251,11 @@ struct ContentView: View {
         }
     }
 
-    private var hasNextQueuedSource: Bool {
-        currentQueueIndex + 1 < sourceQueue.count
-    }
-
-    private var advanceToNextAction: (() -> Void)? {
-        guard hasNextQueuedSource else { return nil }
-        return { advanceToNextSource() }
-    }
-
-    private func advanceToNextSource() {
-        guard conversionController.completedOutputURL != nil,
-              hasNextQueuedSource else { return }
-        currentQueueIndex += 1
-        loadSource(sourceQueue[currentQueueIndex])
+    private var startButtonTitle: String {
+        guard sourceQueue.count > 1 else { return "Convert Approved Plan" }
+        return currentQueueIndex + 1 < sourceQueue.count
+            ? "Approve Plan & Review Next"
+            : "Approve Plan & Start Batch"
     }
 
     private func loadSource(_ source: URL) {
@@ -256,6 +263,7 @@ struct ContentView: View {
         selectedSource = source
         inspection = nil
         gainEnabled = defaultGainEnabled
+        aacStereoEnabled = false
         colorSelection = .needsConfirmation
         subtitleSelection = .needsChoice
         outputURL = nil
@@ -319,6 +327,7 @@ struct ContentView: View {
             outputURL: outputURL,
             inspection: inspection,
             gainEnabled: gainEnabled,
+            aacStereoEnabled: aacStereoEnabled,
             colorSelection: colorSelection,
             subtitleSelection: subtitleSelection
         )) != nil
@@ -339,6 +348,7 @@ struct ContentView: View {
                 outputURL: outputURL,
                 inspection: inspection,
                 gainEnabled: gainEnabled,
+                aacStereoEnabled: aacStereoEnabled,
                 colorSelection: colorSelection,
                 subtitleSelection: subtitleSelection
             )
@@ -359,4 +369,107 @@ struct ContentView: View {
             selectionError = error.localizedDescription
         }
     }
+
+    private func approveOrStart(sourceURL: URL, inspection: MediaInspection) {
+        guard sourceQueue.count > 1 else {
+            startVideoConversion(sourceURL: sourceURL, inspection: inspection)
+            return
+        }
+
+        do {
+            _ = try VideoConversionCommand(
+                sourceURL: sourceURL,
+                outputURL: outputURL,
+                inspection: inspection,
+                gainEnabled: gainEnabled,
+                aacStereoEnabled: aacStereoEnabled,
+                colorSelection: colorSelection,
+                subtitleSelection: subtitleSelection
+            )
+            guard let outputURL else { return }
+            approvedPlans[currentQueueIndex] = ApprovedConversion(
+                sourceURL: sourceURL,
+                inspection: inspection,
+                outputURL: outputURL,
+                gainEnabled: gainEnabled,
+                aacStereoEnabled: aacStereoEnabled,
+                colorSelection: colorSelection,
+                subtitleSelection: subtitleSelection
+            )
+
+            if currentQueueIndex + 1 < sourceQueue.count {
+                currentQueueIndex += 1
+                loadSource(sourceQueue[currentQueueIndex])
+            } else {
+                Task { @MainActor in
+                    await Task.yield()
+                    beginApprovedBatch()
+                }
+            }
+        } catch {
+            selectionError = error.localizedDescription
+        }
+    }
+
+    private func beginApprovedBatch() {
+        guard approvedPlans.count == sourceQueue.count else {
+            selectionError = "Every queued video must have an approved plan before the batch can start."
+            return
+        }
+        completedQueueIndexes = []
+        isBatchRunning = true
+        startApprovedConversion(at: 0)
+    }
+
+    private func startApprovedConversion(at index: Int) {
+        guard let approved = approvedPlans[index] else {
+            isBatchRunning = false
+            selectionError = "The approved plan for video \(index + 1) is unavailable."
+            return
+        }
+        currentQueueIndex = index
+        selectedSource = approved.sourceURL
+        inspection = approved.inspection
+        outputURL = approved.outputURL
+        gainEnabled = approved.gainEnabled
+        aacStereoEnabled = approved.aacStereoEnabled
+        colorSelection = approved.colorSelection
+        subtitleSelection = approved.subtitleSelection
+        conversionController.reset()
+        startVideoConversion(sourceURL: approved.sourceURL, inspection: approved.inspection)
+        if !conversionController.isActive {
+            isBatchRunning = false
+        }
+    }
+
+    private func handleConversionPhaseChange(_ phase: VideoConversionController.Phase) {
+        guard isBatchRunning else { return }
+        switch phase {
+        case .completed:
+            completedQueueIndexes.insert(currentQueueIndex)
+            let nextIndex = currentQueueIndex + 1
+            guard nextIndex < sourceQueue.count else {
+                isBatchRunning = false
+                return
+            }
+            Task { @MainActor in
+                await Task.yield()
+                startApprovedConversion(at: nextIndex)
+            }
+        case .failed, .cancelled:
+            isBatchRunning = false
+        default:
+            break
+        }
+    }
+}
+
+private struct ApprovedConversion {
+    let sourceURL: URL
+    let inspection: MediaInspection
+    let outputURL: URL
+    let gainEnabled: Bool
+    let aacStereoEnabled: Bool
+    let colorSelection: ColorSelection
+    let subtitleSelection: SubtitleSelection
 }

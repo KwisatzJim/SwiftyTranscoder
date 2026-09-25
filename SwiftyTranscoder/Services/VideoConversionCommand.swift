@@ -68,6 +68,7 @@ struct VideoConversionCommand: Sendable {
     let finalOutputURL: URL
     let burnedSubtitleStreamIndex: Int?
     let videoMode: VideoConversionMode
+    let includesAACStereoTrack: Bool
 
     static func partialOutputURL(for finalOutputURL: URL) -> URL {
         finalOutputURL
@@ -81,6 +82,7 @@ struct VideoConversionCommand: Sendable {
         outputURL: URL?,
         inspection: MediaInspection,
         gainEnabled: Bool,
+        aacStereoEnabled: Bool,
         colorSelection: ColorSelection,
         subtitleSelection: SubtitleSelection,
         fileManager: FileManager = .default
@@ -200,6 +202,7 @@ struct VideoConversionCommand: Sendable {
         self.sourceURL = sourceURL
         self.partialOutputURL = partialOutputURL
         self.finalOutputURL = outputURL
+        includesAACStereoTrack = aacStereoEnabled
         var arguments = [
             "-hide_banner",
             "-nostdin",
@@ -210,6 +213,9 @@ struct VideoConversionCommand: Sendable {
             "-sn",
             "-dn",
         ]
+        if aacStereoEnabled {
+            arguments += ["-map", "0:a:0"]
+        }
         if !videoFilters.isEmpty {
             arguments += ["-vf", videoFilters.joined(separator: ",")]
         }
@@ -226,20 +232,39 @@ struct VideoConversionCommand: Sendable {
                 "-fps_mode", "passthrough",
             ]
         }
+        let gainFilter = "volume=6dB,alimiter=limit=0.630957:level=false:latency=true"
         if gainEnabled {
-            arguments += [
-                "-af", "volume=6dB,alimiter=limit=0.630957:level=false:latency=true"
-            ]
+            arguments += ["-filter:a:0", gainFilter]
         }
         arguments += [
-            "-c:a", "ac3",
-            "-b:a", audioSettings.bitRate,
-            "-ar", "48000",
-            "-ac", String(audioSettings.channels),
+            "-c:a:0", "ac3",
+            "-b:a:0", audioSettings.bitRate,
+            "-ar:a:0", "48000",
+            "-ac:a:0", String(audioSettings.channels),
             "-metadata:s:a:0", "language=\(audioLanguage)",
             "-metadata:s:a:0", gainEnabled
                 ? "title=Primary Audio AC-3 \(audioSettings.description) Compatibility +6 dB Limited"
                 : "title=Primary Audio AC-3 \(audioSettings.description) Compatibility",
+            "-disposition:a:0", "default",
+        ]
+        if aacStereoEnabled {
+            let stereoFilter = gainEnabled
+                ? "aformat=channel_layouts=stereo,\(gainFilter)"
+                : "aformat=channel_layouts=stereo"
+            arguments += [
+                "-filter:a:1", stereoFilter,
+                "-c:a:1", "aac",
+                "-b:a:1", "192000",
+                "-ar:a:1", "48000",
+                "-ac:a:1", "2",
+                "-metadata:s:a:1", "language=\(audioLanguage)",
+                "-metadata:s:a:1", gainEnabled
+                    ? "title=Secondary Audio AAC stereo at 192 kb/s Compatibility +6 dB Limited"
+                    : "title=Secondary Audio AAC stereo at 192 kb/s Compatibility",
+                "-disposition:a:1", "0",
+            ]
+        }
+        arguments += [
             "-map_metadata", "0",
             "-map_chapters", "0",
             "-movflags", "+faststart",

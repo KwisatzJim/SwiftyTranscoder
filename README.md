@@ -69,9 +69,9 @@ The script refuses to replace an existing DMG for the current version. To delibe
 3. Resolve any required color or subtitle decision.
 4. Choose an output folder and review the storage preflight.
 5. Turn protected +6 dB gain on or off.
-6. Start the approved plan.
-7. Inspect or play the validated final MP4 before removing the source.
-8. For a multi-file queue, review and approve the next waiting source.
+6. For one source, start the approved plan normally.
+7. For a multi-file queue, approve each plan before encoding begins. Approving the final plan starts the batch, which converts every approved source in order.
+8. Inspect or play the validated final MP4 files before removing the sources.
 
 SwiftyTranscoder never deletes or modifies the source MKV.
 
@@ -81,12 +81,12 @@ The conversion plan can remember gain and subtitle-policy defaults across source
 
 | Area | Supported behavior |
 | --- | --- |
-| Source container | Matroska/MKV or compatible MP4/M4V; multiple sources may be queued and reviewed sequentially |
+| Source container | Matroska/MKV or compatible MP4/M4V; multiple sources may be reviewed first and then converted as an unattended sequential batch |
 | Source video | H.264 or HEVC; `yuv420p` or `yuv420p10le`; confirmed SDR or explicitly user-confirmed untagged SDR |
 | Output video | HEVC Main/Main10 in MP4, `hvc1`, VideoToolbox hardware only |
 | MP4 video behavior | Copy compatible H.264/HEVC video unchanged when only audio is processed |
 | Source audio | AAC, E-AC-3, AC-3, or DTS when decoded by FFmpeg; mono, stereo, or 5.1 layouts |
-| Output audio | AC-3 mono 96 kb/s, stereo 192 kb/s, or 5.1 224 kb/s; 48 kHz |
+| Output audio | Primary/default AC-3 mono 96 kb/s, stereo 192 kb/s, or 5.1 224 kb/s at 48 kHz; optional secondary/non-default AAC stereo at 192 kb/s |
 | Gain | Optional +6 dB with a -4 dBFS pre-encode limiter ceiling |
 | Subtitles | SubRip burn-in; deterministic forced-English or complete English recommendation |
 | Chapters | Preserved as MP4 chapter metadata |
@@ -99,7 +99,7 @@ The conversion plan can remember gain and subtitle-policy defaults across source
 - PGS/VobSub burn-in and subtitle OCR are not implemented.
 - Selectable MP4 subtitle output is not implemented; supported subtitles are either burned in or omitted.
 - MP4/M4V audio-only processing cannot burn subtitles because that would require video re-encoding.
-- Queue advancement remains user-approved; unattended batch conversion is not implemented.
+- Every queued plan must be reviewed and approved before unattended batch conversion begins. A failure or cancellation stops the batch.
 - Automatic crop detection, restoration filters, AI upscaling, and broad encoder controls are deferred.
 - The app currently depends on separately installed Homebrew tools and is not yet a self-contained distributable build.
 
@@ -109,9 +109,10 @@ Representative outputs have been tested through Plex:
 
 - Safari on the MacBook Neo Direct Played both video and audio for HEVC Main10/AC-3 mono, HEVC Main/AC-3 5.1 converted from E-AC-3/Atmos, and HEVC Main/AC-3 5.1 converted from DTS.
 - Firefox on the Rossum Linux PC Direct Streamed video and transcoded audio; playback through the normal HomePod pair was successful.
+- The official Plex HTPC application on Rossum Direct Played copied H.264 video with the optional AAC stereo track, while Firefox/Plex Web transcoded both AC-3 and AAC audio.
 - Confirmed checks include picture and BT.709 color, gain without audible distortion, burned forced and full-English subtitles, audio/video sync, seeking, and chapters.
 
-The Plex application on the Roku TV also passed the representative picture, audio, subtitle, synchronization, seeking, and chapter checks.
+The Plex application on the Roku TV also passed the representative picture, audio, subtitle, synchronization, seeking, and chapter checks, and Direct Played the dual-audio compatibility output.
 
 Detailed implementation and test evidence is recorded in `Documentation/`.
 

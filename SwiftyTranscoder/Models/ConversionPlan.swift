@@ -31,6 +31,7 @@ struct ConversionPlan: Sendable {
     init(
         inspection: MediaInspection,
         gainEnabled: Bool = true,
+        aacStereoEnabled: Bool = false,
         colorSelection: ColorSelection,
         subtitleSelection: SubtitleSelection,
         outputURL: URL? = nil,
@@ -46,10 +47,13 @@ struct ConversionPlan: Sendable {
         frameRate = summary.video.map { "Preserve source (\($0.frameRate))" }
             ?? "Unknown—conversion blocked"
         colorHandling = colorSelection.description
-        audioFormat = inspection.audioStreams.first
+        let primaryAudioFormat = inspection.audioStreams.first
             .flatMap(CompatibilityAudioSettings.init(source:))
             .map { "AC-3 \($0.description), 48 kHz; preserve channel layout" }
             ?? "Unsupported audio layout—conversion blocked"
+        audioFormat = aacStereoEnabled
+            ? "\(primaryAudioFormat); plus AAC stereo at 192 kb/s"
+            : primaryAudioFormat
         subtitleAction = SubtitlePlanAction(
             selection: subtitleSelection,
             streams: inspection.subtitleStreams,
