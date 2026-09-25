@@ -70,7 +70,7 @@ The script refuses to replace an existing DMG for the current version. To delibe
 4. Choose an output folder and review the storage preflight.
 5. Turn protected +6 dB gain on or off.
 6. For one source, start the approved plan normally.
-7. For a multi-file queue, approve each plan before encoding begins. After the final approval, review the ready checkpoint and use the separate **Start Approved Batch** button to convert every approved source in order.
+7. For a multi-file queue, approve each plan before encoding begins. At the ready checkpoint, any queue row can be selected and reopened without losing the other approvals. Use the separate **Start Approved Batch** button to convert every approved source in order.
 8. Inspect or play the validated final MP4 files before removing the sources.
 
 After successful validation, **Show in Finder** opens the destination folder with the completed MP4 selected.

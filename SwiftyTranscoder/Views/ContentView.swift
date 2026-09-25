@@ -109,18 +109,16 @@ struct ContentView: View {
         GroupBox {
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(Array(sourceQueue.enumerated()), id: \.offset) { index, source in
-                    HStack(spacing: 8) {
-                        Image(systemName: queueIcon(for: index))
-                            .foregroundStyle(queueColor(for: index))
-                        Text(source.lastPathComponent)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        Spacer(minLength: 8)
-                        Text(queueStatus(for: index))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    if isBatchReady {
+                        Button {
+                            selectApprovedPlan(at: index)
+                        } label: {
+                            queueRow(index: index, source: source)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        queueRow(index: index, source: source)
                     }
-                    .font(index == currentQueueIndex ? .body.weight(.semibold) : .body)
                 }
                 Divider()
                 Toggle(
@@ -141,6 +139,22 @@ struct ContentView: View {
                 .font(.headline)
         }
         .frame(maxWidth: 760)
+    }
+
+    private func queueRow(index: Int, source: URL) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: queueIcon(for: index))
+                .foregroundStyle(queueColor(for: index))
+            Text(source.lastPathComponent)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer(minLength: 8)
+            Text(queueStatus(for: index))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .contentShape(Rectangle())
+        .font(index == currentQueueIndex ? .body.weight(.semibold) : .body)
     }
 
     private func queueIcon(for index: Int) -> String {
@@ -296,10 +310,10 @@ struct ContentView: View {
         GroupBox {
             VStack(alignment: .leading, spacing: 6) {
                 Text("All \(sourceQueue.count) conversion plans are approved. No encoding has started yet.")
-                Text("Start the batch when you are ready, or reopen the final plan to change it.")
+                Text("Select any queue row to review it. Start the batch when you are ready, or reopen the selected plan to change it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Button("Reopen Final Plan", systemImage: "pencil") {
+                Button("Reopen Selected Plan", systemImage: "pencil") {
                     approvedPlans.removeValue(forKey: currentQueueIndex)
                     isBatchReady = false
                 }
@@ -452,15 +466,38 @@ struct ContentView: View {
                 subtitleSelection: subtitleSelection
             )
 
-            if currentQueueIndex + 1 < sourceQueue.count {
-                currentQueueIndex += 1
-                loadSource(sourceQueue[currentQueueIndex])
-            } else {
+            if approvedPlans.count == sourceQueue.count {
                 isBatchReady = true
+            } else if let nextIndex = nextUnapprovedIndex {
+                currentQueueIndex = nextIndex
+                loadSource(sourceQueue[nextIndex])
+            } else {
+                selectionError = "A waiting video could not be found in the queue."
             }
         } catch {
             selectionError = error.localizedDescription
         }
+    }
+
+    private var nextUnapprovedIndex: Int? {
+        let laterIndexes = sourceQueue.indices.filter {
+            $0 > currentQueueIndex && approvedPlans[$0] == nil
+        }
+        return laterIndexes.first ?? sourceQueue.indices.first {
+            approvedPlans[$0] == nil
+        }
+    }
+
+    private func selectApprovedPlan(at index: Int) {
+        guard isBatchReady, let approved = approvedPlans[index] else { return }
+        currentQueueIndex = index
+        selectedSource = approved.sourceURL
+        inspection = approved.inspection
+        outputURL = approved.outputURL
+        gainEnabled = approved.gainEnabled
+        aacStereoEnabled = approved.aacStereoEnabled
+        colorSelection = approved.colorSelection
+        subtitleSelection = approved.subtitleSelection
     }
 
     private func performPrimaryAction(sourceURL: URL, inspection: MediaInspection) {
