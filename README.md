@@ -73,6 +73,8 @@ The script refuses to replace an existing DMG for the current version. To delibe
 7. For a multi-file queue, approve each plan before encoding begins. Approving the final plan starts the batch, which converts every approved source in order.
 8. Inspect or play the validated final MP4 files before removing the sources.
 
+After successful validation, **Show in Finder** opens the destination folder with the completed MP4 selected.
+
 SwiftyTranscoder never deletes or modifies the source MKV.
 
 While FFmpeg is converting, SwiftyTranscoder asks macOS to prevent automatic idle system sleep. The request ends after completion, cancellation, or failure; it does not block manually selected sleep or closing a MacBook lid.

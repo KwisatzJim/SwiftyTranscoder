@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct VideoConversionControlsView: View {
@@ -68,6 +69,9 @@ struct VideoConversionControlsView: View {
                 Text(output.path(percentEncoded: false))
                     .font(.caption)
                     .textSelection(.enabled)
+                Button("Show in Finder", systemImage: "folder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([output])
+                }
 
             case .cancelled(let partialOutput):
                 statusMessage(
