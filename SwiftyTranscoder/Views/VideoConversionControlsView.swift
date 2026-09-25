@@ -4,6 +4,9 @@ struct VideoConversionControlsView: View {
     @ObservedObject var controller: VideoConversionController
     let canStart: Bool
     let startButtonTitle: String
+    let batchItemNumber: Int?
+    let batchItemCount: Int
+    let completedBatchCount: Int
     let existingPartialOutput: URL?
     let start: () -> Void
     @State private var partialPendingTrash: URL?
@@ -32,12 +35,22 @@ struct VideoConversionControlsView: View {
             case .running:
                 VStack(spacing: 4) {
                     HStack {
-                        Text("Encoding approved plan… \(controller.progress.formatted(.percent.precision(.fractionLength(0))))")
+                        Text(encodingStatus)
                         Spacer()
                         Text(progressStatus)
                             .foregroundStyle(.secondary)
                     }
                     ProgressView(value: controller.progress)
+                    if batchItemNumber != nil {
+                        HStack {
+                            Text("Overall batch")
+                            Spacer()
+                            Text(batchProgress.formatted(.percent.precision(.fractionLength(0))))
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        ProgressView(value: batchProgress)
+                    }
                 }
                 Button("Cancel", role: .cancel) { controller.cancel() }
                 if controller.isPreventingIdleSystemSleep {
@@ -116,6 +129,22 @@ struct VideoConversionControlsView: View {
             return "ETA calculating…"
         }
         return "ETA \(formattedDuration(remaining))"
+    }
+
+    private var encodingStatus: String {
+        let percent = controller.progress.formatted(.percent.precision(.fractionLength(0)))
+        if let batchItemNumber {
+            return "Encoding video \(batchItemNumber) of \(batchItemCount)… \(percent)"
+        }
+        return "Encoding approved plan… \(percent)"
+    }
+
+    private var batchProgress: Double {
+        guard batchItemCount > 0 else { return 0 }
+        return min(
+            max((Double(completedBatchCount) + controller.progress) / Double(batchItemCount), 0),
+            1
+        )
     }
 
     private func formattedDuration(_ interval: TimeInterval) -> String {

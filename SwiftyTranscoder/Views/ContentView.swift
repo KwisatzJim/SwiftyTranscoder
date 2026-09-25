@@ -210,6 +210,9 @@ struct ContentView: View {
                 controller: conversionController,
                 canStart: canStartVideoConversion(inspection: inspection),
                 startButtonTitle: startButtonTitle,
+                batchItemNumber: isBatchRunning ? currentQueueIndex + 1 : nil,
+                batchItemCount: sourceQueue.count,
+                completedBatchCount: completedQueueIndexes.count,
                 existingPartialOutput: existingPartialOutput,
                 start: { approveOrStart(sourceURL: sourceURL, inspection: inspection) }
             )
