@@ -8,6 +8,7 @@ struct ContentView: View {
     @State private var currentQueueIndex = 0
     @State private var approvedPlans: [Int: ApprovedConversion] = [:]
     @State private var completedQueueIndexes: Set<Int> = []
+    @State private var isBatchReady = false
     @State private var isBatchRunning = false
     @State private var selectedSource: URL?
     @State private var inspection: MediaInspection?
@@ -144,14 +145,16 @@ struct ContentView: View {
 
     private func queueIcon(for index: Int) -> String {
         if isCompletedQueueItem(index) { return "checkmark.circle.fill" }
-        if approvedPlans[index] != nil && index != currentQueueIndex { return "checkmark.circle" }
+        if isBatchRunning && index == currentQueueIndex { return "play.circle.fill" }
+        if approvedPlans[index] != nil { return "checkmark.circle" }
         if index == currentQueueIndex { return "play.circle.fill" }
         return "circle"
     }
 
     private func queueColor(for index: Int) -> Color {
         if isCompletedQueueItem(index) { return .green }
-        if approvedPlans[index] != nil && index != currentQueueIndex { return .blue }
+        if isBatchRunning && index == currentQueueIndex { return .accentColor }
+        if approvedPlans[index] != nil { return .blue }
         if index == currentQueueIndex { return .accentColor }
         return .secondary
     }
@@ -226,7 +229,11 @@ struct ContentView: View {
                 savedOutputFolderPath: $savedOutputFolderPath,
                 saveDefaults: saveCurrentDefaults
             )
-            .disabled(isBatchRunning)
+            .disabled(isBatchRunning || isBatchReady)
+
+            if isBatchReady {
+                batchReadyView
+            }
 
             VideoConversionControlsView(
                 controller: conversionController,
@@ -236,7 +243,7 @@ struct ContentView: View {
                 batchItemCount: sourceQueue.count,
                 completedBatchCount: completedQueueIndexes.count,
                 existingPartialOutput: existingPartialOutput,
-                start: { approveOrStart(sourceURL: sourceURL, inspection: inspection) }
+                start: { performPrimaryAction(sourceURL: sourceURL, inspection: inspection) }
             )
 
             TechnicalInspectionView(inspection: inspection)
@@ -267,6 +274,7 @@ struct ContentView: View {
             currentQueueIndex = 0
             approvedPlans = [:]
             completedQueueIndexes = []
+            isBatchReady = false
             isBatchRunning = false
             guard let source = sourceQueue.first else { return }
             loadSource(source)
@@ -278,9 +286,31 @@ struct ContentView: View {
 
     private var startButtonTitle: String {
         guard sourceQueue.count > 1 else { return "Convert Approved Plan" }
+        if isBatchReady { return "Start Approved Batch" }
         return currentQueueIndex + 1 < sourceQueue.count
             ? "Approve Plan & Review Next"
-            : "Approve Plan & Start Batch"
+            : "Approve Final Plan"
+    }
+
+    private var batchReadyView: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("All \(sourceQueue.count) conversion plans are approved. No encoding has started yet.")
+                Text("Start the batch when you are ready, or reopen the final plan to change it.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button("Reopen Final Plan", systemImage: "pencil") {
+                    approvedPlans.removeValue(forKey: currentQueueIndex)
+                    isBatchReady = false
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            Label("Batch ready to start", systemImage: "checkmark.seal.fill")
+                .font(.headline)
+                .foregroundStyle(.green)
+        }
+        .frame(maxWidth: 760)
     }
 
     private func loadSource(_ source: URL) {
@@ -426,13 +456,18 @@ struct ContentView: View {
                 currentQueueIndex += 1
                 loadSource(sourceQueue[currentQueueIndex])
             } else {
-                Task { @MainActor in
-                    await Task.yield()
-                    beginApprovedBatch()
-                }
+                isBatchReady = true
             }
         } catch {
             selectionError = error.localizedDescription
+        }
+    }
+
+    private func performPrimaryAction(sourceURL: URL, inspection: MediaInspection) {
+        if isBatchReady {
+            beginApprovedBatch()
+        } else {
+            approveOrStart(sourceURL: sourceURL, inspection: inspection)
         }
     }
 
@@ -442,6 +477,7 @@ struct ContentView: View {
             return
         }
         completedQueueIndexes = []
+        isBatchReady = false
         isBatchRunning = true
         startApprovedConversion(at: 0)
     }
