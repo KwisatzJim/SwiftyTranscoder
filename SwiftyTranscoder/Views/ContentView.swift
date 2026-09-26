@@ -252,7 +252,7 @@ struct ContentView: View {
             VideoConversionControlsView(
                 controller: conversionController,
                 canStart: canStartVideoConversion(inspection: inspection)
-                    && (!isBatchReady || batchHasSufficientSpace),
+                    && (!isBatchReady || batchHasSufficientSpace && duplicateBatchOutputURLs.isEmpty),
                 startButtonTitle: startButtonTitle,
                 batchItemNumber: isBatchRunning ? currentQueueIndex + 1 : nil,
                 batchItemCount: sourceQueue.count,
@@ -331,6 +331,20 @@ struct ContentView: View {
                     )
                     .font(.caption)
                     .foregroundStyle(.orange)
+                }
+                if duplicateBatchOutputURLs.isEmpty {
+                    Label("Every approved output filename is unique.", systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(duplicateBatchOutputURLs, id: \.self) { output in
+                        Label(
+                            "Duplicate batch destination: \(output.path(percentEncoded: false))",
+                            systemImage: "exclamationmark.triangle.fill"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    }
                 }
                 Button("Reopen Selected Plan", systemImage: "pencil") {
                     approvedPlans.removeValue(forKey: currentQueueIndex)
@@ -536,6 +550,10 @@ struct ContentView: View {
             selectionError = "The approved batch requires more destination space than is currently available."
             return
         }
+        guard duplicateBatchOutputURLs.isEmpty else {
+            selectionError = "Two or more approved plans use the same output filename. Reopen a plan and choose a different destination folder."
+            return
+        }
         completedQueueIndexes = []
         isBatchReady = false
         isBatchRunning = true
@@ -582,6 +600,27 @@ struct ContentView: View {
         }
 
         return checksByVolume.values.sorted { $0.volumeName < $1.volumeName }
+    }
+
+    private var duplicateBatchOutputURLs: [URL] {
+        let grouped = Dictionary(grouping: approvedPlans.values) { approved in
+            canonicalOutputKey(approved.outputURL)
+        }
+        return grouped.values.compactMap { matches in
+            guard matches.count > 1 else { return nil }
+            return matches[0].outputURL
+        }
+        .sorted { $0.path(percentEncoded: false) < $1.path(percentEncoded: false) }
+    }
+
+    private func canonicalOutputKey(_ outputURL: URL) -> String {
+        outputURL.deletingLastPathComponent()
+            .resolvingSymlinksInPath()
+            .appendingPathComponent(outputURL.lastPathComponent)
+            .standardizedFileURL
+            .path(percentEncoded: false)
+            .precomposedStringWithCanonicalMapping
+            .lowercased()
     }
 
     private func startApprovedConversion(at index: Int) {

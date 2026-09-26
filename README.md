@@ -1,6 +1,6 @@
 # SwiftyTranscoder
 
-SwiftyTranscoder is a native macOS SwiftUI application for turning one MKV at a time into an understandable, Plex-friendly MP4. It inspects the source first, explains every automatic choice, and uses Apple VideoToolbox hardware encoding for HEVC output.
+SwiftyTranscoder is a native macOS SwiftUI application for turning MKV and compatible MP4 sources into understandable, Plex-friendly MP4 files. It inspects every source first, explains every automatic choice, and uses Apple VideoToolbox hardware encoding for HEVC output.
 
 The source MKV is always read-only. Conversion is written to a clearly named `.partial.mp4`, independently validated, and only then promoted to the final `.mp4` filename.
 
@@ -17,7 +17,8 @@ The source MKV is always read-only. Conversion is written to a clearly named `.p
 - For foreign-language audio, prefer a complete ordinary English subtitle over English SDH and burn the visible choice into the video.
 - Require explicit confirmation before treating missing color metadata as SDR and tagging the output as limited-range BT.709.
 - Show progress, support safe cancellation, retain clearly labeled incomplete output, and offer confirmation-gated movement of that file to the macOS Trash.
-- Refuse to overwrite existing output and verify destination free space before starting.
+- Review and approve an entire batch before encoding, then process its files sequentially with overall progress, completion notifications, and sleep prevention.
+- Refuse to overwrite existing output, verify aggregate destination free space, and block duplicate output paths before a batch starts.
 - Validate video profile, pixel format, color metadata, dimensions, frame rate, audio format, channel layout, bitrate, duration, and subtitle policy before completing a file.
 
 ## Requirements
