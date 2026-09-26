@@ -277,7 +277,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(Array(sourceQueue.enumerated()), id: \.offset) { index, source in
                     HStack(spacing: 8) {
-                        if isBatchReady {
+                        if approvedPlans[index] != nil {
                             Button {
                                 selectApprovedPlan(at: index)
                             } label: {
@@ -362,8 +362,8 @@ struct ContentView: View {
     private func queueStatus(for index: Int) -> String {
         if isCompletedQueueItem(index) { return "Completed" }
         if isBatchRunning && index == currentQueueIndex { return "Converting" }
+        if !isBatchReady && index == currentQueueIndex { return "Reviewing" }
         if approvedPlans[index] != nil { return "Approved" }
-        if index == currentQueueIndex { return "Reviewing" }
         return "Waiting"
     }
 
@@ -744,9 +744,13 @@ struct ContentView: View {
     }
 
     private func selectApprovedPlan(at index: Int) {
-        guard isBatchReady, let approved = approvedPlans[index] else { return }
+        guard let approved = approvedPlans[index] else { return }
         currentQueueIndex = index
         restoreApprovedPlan(approved)
+        if !isBatchReady {
+            technicalDetailsExpanded = false
+            wizardStep = .review
+        }
     }
 
     private func restoreApprovedPlan(_ approved: ApprovedConversion) {
