@@ -85,6 +85,13 @@ struct HumanReadableAnalysisView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
+        case .likelyForcedEnglish(let stream, let reason):
+            Text("Possible track: stream \(stream.index), \(stream.tags?["title"] ?? "Untitled English track")")
+                .font(.caption.weight(.medium))
+            Text(reason)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
         case .ambiguousForcedEnglish(let candidates):
             Text("Candidates: \(candidates.map { "stream \($0.index)" }.joined(separator: ", "))")
                 .font(.caption)

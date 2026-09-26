@@ -2,6 +2,7 @@ import Foundation
 
 enum SubtitleRecommendation: Sendable {
     case forcedEnglishFound(stream: MediaStream, reason: String)
+    case likelyForcedEnglish(stream: MediaStream, reason: String)
     case ambiguousForcedEnglish(candidates: [MediaStream])
     case fullEnglishFound(stream: MediaStream, reason: String)
     case ambiguousFullEnglish(candidates: [MediaStream])
@@ -12,6 +13,8 @@ enum SubtitleRecommendation: Sendable {
         switch self {
         case .forcedEnglishFound:
             "Forced English found—burn in"
+        case .likelyForcedEnglish:
+            "Likely forced—please confirm"
         case .ambiguousForcedEnglish:
             "Multiple forced English tracks—choose one"
         case .fullEnglishFound:
@@ -36,7 +39,9 @@ struct SubtitleRecommendationEngine: Sendable {
         }
 
         let candidates = streams.compactMap(Candidate.init)
-        guard !candidates.isEmpty else { return .noForcedEnglish }
+        guard !candidates.isEmpty else {
+            return likelyForcedRecommendation(from: streams)
+        }
 
         let strongestEvidence = candidates.map(\.evidence).max() ?? .title
         var preferred = candidates.filter { $0.evidence == strongestEvidence }
@@ -58,6 +63,49 @@ struct SubtitleRecommendationEngine: Sendable {
         }
 
         return .forcedEnglishFound(stream: choice.stream, reason: reason)
+    }
+
+    private func likelyForcedRecommendation(from streams: [MediaStream]) -> SubtitleRecommendation {
+        let englishTracks = streams.filter { stream in
+            let language = stream.tags?["language"]?.lowercased()
+            let title = stream.tags?["title"]?.lowercased() ?? ""
+            return language == "eng"
+                || language == "en"
+                || language?.hasPrefix("en-") == true
+                || title.contains("english")
+        }
+
+        let evidenceTracks = englishTracks.compactMap { stream -> (MediaStream, Int)? in
+            guard let count = stream.subtitleEvidence?.eventCount, count > 0 else { return nil }
+            return (stream, count)
+        }
+
+        let likely = evidenceTracks.filter { stream, count in
+            let title = stream.tags?["title"]?.lowercased() ?? ""
+            let isSDH = stream.disposition?.hearingImpaired == 1
+                || title.range(of: #"\bsdh\b"#, options: .regularExpression) != nil
+                || title.contains("hearing impaired")
+                || title.contains("closed captions")
+            guard !isSDH, stream.codecName == "subrip", count <= 200 else { return false }
+
+            return evidenceTracks.contains { otherStream, otherCount in
+                otherStream.index != stream.index
+                    && otherCount >= 300
+                    && otherCount >= count * 3
+            }
+        }
+
+        guard likely.count == 1, let (stream, count) = likely.first else {
+            return .noForcedEnglish
+        }
+        let comparisonCount = evidenceTracks
+            .filter { $0.0.index != stream.index }
+            .map(\.1)
+            .max() ?? 0
+        return .likelyForcedEnglish(
+            stream: stream,
+            reason: "Stream \(stream.index) has \(count) subtitle events, compared with \(comparisonCount) in a fuller English track. This is statistical evidence only; confirm the track before burn-in."
+        )
     }
 
     private func recommendFullEnglish(

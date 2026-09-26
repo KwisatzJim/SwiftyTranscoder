@@ -160,7 +160,9 @@ enum SubtitlePlanAction: Sendable {
         case .omit:
             self = .omit(reason: "User choice")
         case .needsChoice:
-            if case .ambiguousForcedEnglish(let candidates) = recommendation {
+            if case .likelyForcedEnglish(let stream, _) = recommendation {
+                self = .chooseBeforeConversion(candidateIndexes: [stream.index])
+            } else if case .ambiguousForcedEnglish(let candidates) = recommendation {
                 self = .chooseBeforeConversion(candidateIndexes: candidates.map(\.index))
             } else if case .ambiguousFullEnglish(let candidates) = recommendation {
                 self = .chooseBeforeConversion(candidateIndexes: candidates.map(\.index))
@@ -191,6 +193,8 @@ enum SubtitleSelection: Hashable, Sendable {
         switch recommendation {
         case .forcedEnglishFound(let stream, _):
             self = .burnIn(streamIndex: stream.index)
+        case .likelyForcedEnglish:
+            self = .needsChoice
         case .fullEnglishFound(let stream, _):
             self = .burnIn(streamIndex: stream.index)
         case .ambiguousForcedEnglish, .ambiguousFullEnglish:
