@@ -175,7 +175,7 @@ struct ContentView: View {
 
             HStack {
                 if selectedSource != nil {
-                    Button("Return to Current Batch", systemImage: "arrow.left") {
+                    Button(returnToSelectionTitle, systemImage: "arrow.left") {
                         wizardStep = .review
                     }
                 }
@@ -187,6 +187,10 @@ struct ContentView: View {
             }
         }
         .padding(.vertical, 28)
+    }
+
+    private var returnToSelectionTitle: String {
+        sourceQueue.count > 1 ? "Return to Current Batch" : "Return to Current Video"
     }
 
     @ViewBuilder
@@ -485,7 +489,7 @@ struct ContentView: View {
 
     private func selectedSourceHeader(_ url: URL) -> some View {
         VStack(spacing: 6) {
-            Label("Selected source", systemImage: "checkmark.circle.fill")
+            Label(selectedSourceHeading, systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green)
                 .font(.headline)
 
@@ -501,6 +505,11 @@ struct ContentView: View {
                 .truncationMode(.middle)
         }
         .frame(maxWidth: 780)
+    }
+
+    private var selectedSourceHeading: String {
+        guard sourceQueue.count > 1 else { return "Selected video" }
+        return "Video \(currentQueueIndex + 1) of \(sourceQueue.count)"
     }
 
     private func conversionPlan(
