@@ -20,6 +20,7 @@ struct VideoConversionControlsView: View {
             case .idle:
                 Button(startButtonTitle, systemImage: "checkmark.circle", action: start)
                     .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
                     .disabled(!canStart)
                 if !canStart, let disabledReason {
                     Label(disabledReason, systemImage: "exclamationmark.triangle.fill")

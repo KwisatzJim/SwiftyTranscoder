@@ -56,25 +56,30 @@ struct ContentView: View {
                     wizardHeader
                         .id("wizardTop")
 
-                    switch wizardStep {
-                    case .choose:
-                        chooseStep
-                    case .review:
-                        reviewStep
-                    case .plan:
-                        planStep
-                    case .convert:
-                        convertStep
+                    Group {
+                        switch wizardStep {
+                        case .choose:
+                            chooseStep
+                        case .review:
+                            reviewStep
+                        case .plan:
+                            planStep
+                        case .convert:
+                            convertStep
+                        }
                     }
+                    .id(wizardStep)
+                    .transition(.opacity)
                 }
                 .padding(32)
                 .frame(maxWidth: .infinity)
+                .animation(.easeInOut(duration: 0.15), value: wizardStep)
             }
             .onChange(of: wizardStep) { _, _ in
                 scrollProxy.scrollTo("wizardTop", anchor: .top)
             }
         }
-        .frame(minWidth: 560, minHeight: 360)
+        .frame(minWidth: 820, minHeight: 620)
         .fileImporter(
             isPresented: $isChoosingSource,
             allowedContentTypes: Self.sourceTypes,
@@ -184,6 +189,7 @@ struct ContentView: View {
                     isChoosingSource = true
                 }
                 .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
             }
         }
         .padding(.vertical, 28)
@@ -234,6 +240,7 @@ struct ContentView: View {
                         wizardStep = .plan
                     }
                     .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
                     .disabled(inspection == nil || isInspecting)
                 }
                 .frame(maxWidth: 760)
@@ -269,6 +276,7 @@ struct ContentView: View {
                             wizardStep = .convert
                         }
                         .buttonStyle(.borderedProminent)
+                        .keyboardShortcut(.defaultAction)
                     }
                 }
                 .frame(maxWidth: 760)
@@ -304,10 +312,11 @@ struct ContentView: View {
                     start: { performPrimaryAction(sourceURL: selectedSource, inspection: inspection) }
                 )
 
-                if !conversionController.isActive && !isBatchRunning {
+                if !conversionController.isActive && !isBatchRunning && !isBatchReady {
                     Button("Choose More Videos…", systemImage: "folder") {
                         isChoosingSource = true
                     }
+                    .keyboardShortcut(.defaultAction)
                 }
             }
         }
@@ -357,7 +366,9 @@ struct ContentView: View {
         LazyVStack(alignment: .leading, spacing: 6) {
             ForEach(Array(sourceQueue.enumerated()), id: \.offset) { index, source in
                 HStack(spacing: 8) {
-                    if approvedPlans[index] != nil && !isBatchRunning {
+                    if approvedPlans[index] != nil
+                        && !isBatchRunning
+                        && completedQueueIndexes.isEmpty {
                         Button {
                             selectApprovedPlan(at: index)
                         } label: {
