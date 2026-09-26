@@ -199,11 +199,17 @@ struct ContentView: View {
                 }
 
                 HStack {
-                    Button("Choose Different Videos") {
-                        wizardStep = .choose
+                    if isBatchReady {
+                        Button("Return to Batch Summary", systemImage: "arrow.left") {
+                            wizardStep = .convert
+                        }
+                    } else {
+                        Button("Choose Different Videos") {
+                            wizardStep = .choose
+                        }
                     }
                     Spacer()
-                    Button("Continue to Plan", systemImage: "arrow.right") {
+                    Button(isBatchReady ? "View Approved Plan" : "Continue to Plan", systemImage: "arrow.right") {
                         wizardStep = .plan
                     }
                     .buttonStyle(.borderedProminent)
@@ -222,13 +228,27 @@ struct ContentView: View {
                     sourceQueueView
                 }
                 selectedSourceHeader(selectedSource)
-                conversionPlan(inspection, sourceURL: selectedSource)
+                conversionPlan(
+                    inspection,
+                    sourceURL: selectedSource,
+                    showsApprovalAction: !isBatchReady
+                )
 
                 HStack {
                     Button("Back to Review", systemImage: "arrow.left") {
                         wizardStep = .review
                     }
                     Spacer()
+                    if isBatchReady {
+                        Button("Reopen This Plan", systemImage: "pencil") {
+                            approvedPlans.removeValue(forKey: currentQueueIndex)
+                            isBatchReady = false
+                        }
+                        Button("Return to Batch Summary", systemImage: "checkmark.seal") {
+                            wizardStep = .convert
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
                 }
                 .frame(maxWidth: 760)
             }
@@ -277,7 +297,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(Array(sourceQueue.enumerated()), id: \.offset) { index, source in
                     HStack(spacing: 8) {
-                        if approvedPlans[index] != nil {
+                        if approvedPlans[index] != nil && !isBatchRunning {
                             Button {
                                 selectApprovedPlan(at: index)
                             } label: {
@@ -437,7 +457,11 @@ struct ContentView: View {
         .frame(maxWidth: 780)
     }
 
-    private func conversionPlan(_ inspection: MediaInspection, sourceURL: URL) -> some View {
+    private func conversionPlan(
+        _ inspection: MediaInspection,
+        sourceURL: URL,
+        showsApprovalAction: Bool
+    ) -> some View {
         let conversionBlockingReason = conversionBlockingReason(inspection: inspection)
 
         return VStack(spacing: 14) {
@@ -465,17 +489,19 @@ struct ContentView: View {
             )
             .disabled(isBatchRunning || isBatchReady)
 
-            VideoConversionControlsView(
-                controller: conversionController,
-                canStart: conversionBlockingReason == nil,
-                disabledReason: conversionBlockingReason,
-                startButtonTitle: startButtonTitle,
-                batchItemNumber: nil,
-                batchItemCount: sourceQueue.count,
-                completedBatchCount: completedQueueIndexes.count,
-                existingPartialOutput: existingPartialOutput,
-                start: { performPrimaryAction(sourceURL: sourceURL, inspection: inspection) }
-            )
+            if showsApprovalAction {
+                VideoConversionControlsView(
+                    controller: conversionController,
+                    canStart: conversionBlockingReason == nil,
+                    disabledReason: conversionBlockingReason,
+                    startButtonTitle: startButtonTitle,
+                    batchItemNumber: nil,
+                    batchItemCount: sourceQueue.count,
+                    completedBatchCount: completedQueueIndexes.count,
+                    existingPartialOutput: existingPartialOutput,
+                    start: { performPrimaryAction(sourceURL: sourceURL, inspection: inspection) }
+                )
+            }
         }
     }
 
@@ -747,10 +773,8 @@ struct ContentView: View {
         guard let approved = approvedPlans[index] else { return }
         currentQueueIndex = index
         restoreApprovedPlan(approved)
-        if !isBatchReady {
-            technicalDetailsExpanded = false
-            wizardStep = .review
-        }
+        technicalDetailsExpanded = false
+        wizardStep = .review
     }
 
     private func restoreApprovedPlan(_ approved: ApprovedConversion) {
