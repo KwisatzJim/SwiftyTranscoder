@@ -1,10 +1,1 @@
-.DS_Store
-DerivedData/
-build/
-dist/
-*.dmg
-*.mkv
-*.mp4
-*.partial.mp4
-*.xcuserstate
-xcuserdata/
+.build/
