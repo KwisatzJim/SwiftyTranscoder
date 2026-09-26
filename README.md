@@ -30,15 +30,13 @@ The source MKV is always read-only. Conversion is written to a clearly named `.p
 - macOS 14 or later
 - Apple Silicon Mac with VideoToolbox HEVC support
 - Xcode 27 or a compatible newer version for development builds
-- Homebrew FFmpeg tools:
-  - `ffprobe` at `/opt/homebrew/bin/ffprobe` or `/usr/local/bin/ffprobe`
-  - libass-enabled `ffmpeg-full` at `/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg` or `/usr/local/opt/ffmpeg-full/bin/ffmpeg`
+- A source-build environment with `curl`, `shasum`, `tar`, `cmake`, `make`, and `pkg-config` when building the application from source
 
-The current app expects those exact Homebrew locations. FFmpeg is not bundled inside the application yet.
+Release application builds contain their own checksum-pinned FFmpeg 9.0.2 tools. Homebrew FFmpeg is not required for normal use. The former Homebrew locations remain development fallbacks if code is run outside a prepared application bundle.
 
 ## Build and run
 
-1. Install the required Homebrew `ffmpeg` and `ffmpeg-full` packages.
+1. Prepare the pinned self-contained tools with `Scripts/build-toolchain.sh` and `Scripts/stage-toolchain-bundle.sh`.
 2. Open `SwiftyTranscoder.xcodeproj` in Xcode.
 3. Select the **SwiftyTranscoder** scheme and **My Mac** as the destination.
 4. Press **Run** (`Command-R`).
@@ -63,7 +61,7 @@ swift test
 
 ## Local release candidate
 
-The personal, arm64 `0.8.0` release candidate is available at `dist/SwiftyTranscoder_0.8.0_arm64.dmg`, with its SHA-256 checksum in `dist/SHA256SUMS.txt`. It is ad-hoc signed for local use, not Developer ID signed or notarized. Homebrew `ffprobe` and `ffmpeg-full` must already be installed at the paths listed above.
+The personal, arm64 `0.8.0` release candidate is available at `dist/SwiftyTranscoder_0.8.0_arm64.dmg`, with its SHA-256 checksum in `dist/SHA256SUMS.txt`. It is ad-hoc signed for local use, not Developer ID signed or notarized. That existing artifact predates the self-contained toolchain and still requires Homebrew FFmpeg. A later release milestone will produce and validate a new self-contained DMG.
 
 Create a verified local release from the repository root with:
 
@@ -123,9 +121,9 @@ The conversion plan can remember gain and subtitle-policy defaults across source
 - Every queued plan must be reviewed and approved before unattended batch conversion begins. A failure or cancellation stops the batch.
 - Automatic crop detection, restoration filters, AI upscaling, and broad encoder controls are deferred.
 - Likely-forced analysis depends on trustworthy Matroska subtitle statistics. Missing, malformed, lone, or ambiguous statistical evidence produces no recommendation.
-- The app currently depends on separately installed Homebrew tools and is not yet a self-contained distributable build.
+- The existing `0.8.0` DMG predates the self-contained toolchain and should not be treated as the new release artifact.
 
-The self-contained distribution design is documented in `Documentation/Milestone-52.md`. Milestone 53 adds a checksum-pinned minimal FFmpeg build that passed isolated capability and representative media tests. Milestone 54 proves bundle-relative loading and catches that Homebrew's current supporting libraries require macOS 26 or 27, so they cannot be shipped in an app targeting macOS 14. Milestone 55 replaces that runtime closure with checksum-pinned, macOS 14 static builds of libass, FreeType, FriBidi, and HarfBuzz. Milestone 56 embeds the two verified helpers and six license-notice files in the signed app; the resulting Release app is approximately 21 MB and contains no Homebrew-linked code. Runtime lookup remains on the established Homebrew paths until the next focused milestone.
+The self-contained distribution design is documented in `Documentation/Milestone-52.md`. Milestone 53 adds a checksum-pinned minimal FFmpeg build that passed isolated capability and representative media tests. Milestone 54 proves bundle-relative loading and catches that Homebrew's current supporting libraries require macOS 26 or 27, so they cannot be shipped in an app targeting macOS 14. Milestone 55 replaces that runtime closure with checksum-pinned, macOS 14 static builds of libass, FreeType, FriBidi, and HarfBuzz. Milestone 56 embeds the two verified helpers and six license-notice files in the signed app. Milestone 57 makes inspection and conversion prefer those app-contained helpers and retains Homebrew solely as a development fallback. The approximately 21 MB Release app passed signed, bundled inspection and conversion tests.
 
 ## Plex validation
 

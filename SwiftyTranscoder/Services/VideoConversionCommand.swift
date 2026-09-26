@@ -54,6 +54,7 @@ struct VideoConversionCommand: Sendable {
         aacStereoEnabled: Bool,
         colorSelection: ColorSelection,
         subtitleSelection: SubtitleSelection,
+        bundleURL: URL = Bundle.main.bundleURL,
         fileManager: FileManager = .default
     ) throws {
         let isMP4Source = ["mp4", "m4v"].contains(sourceURL.pathExtension.lowercased())
@@ -120,11 +121,11 @@ struct VideoConversionCommand: Sendable {
             )
         }
 
-        let candidates = [
-            "/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg",
-            "/usr/local/opt/ffmpeg-full/bin/ffmpeg"
-        ]
-        guard let executablePath = candidates.first(where: fileManager.isExecutableFile(atPath:)) else {
+        guard let executableURL = MediaToolLocator.executableURL(
+            for: .ffmpeg,
+            bundleURL: bundleURL,
+            fileManager: fileManager
+        ) else {
             throw VideoConversionCommandError.ffmpegFullNotFound
         }
 
@@ -167,7 +168,7 @@ struct VideoConversionCommand: Sendable {
             ? audio.tags?["language"] ?? "und"
             : "und"
 
-        self.executableURL = URL(fileURLWithPath: executablePath)
+        self.executableURL = executableURL
         self.sourceURL = sourceURL
         self.partialOutputURL = partialOutputURL
         self.finalOutputURL = outputURL
@@ -303,7 +304,7 @@ enum VideoConversionCommandError: LocalizedError {
         case .partialOutputExists(let file):
             "The incomplete output \(file) already exists. Move or remove it before retrying."
         case .ffmpegFullNotFound:
-            "The libass-capable ffmpeg-full executable was not found. Install ffmpeg-full before converting subtitles."
+            "The bundled ffmpeg helper is unavailable, and no Homebrew development fallback was found. Reinstall SwiftyTranscoder."
         case .subtitleNotFound(let streamIndex):
             "Selected subtitle stream \(streamIndex) is no longer present in the inspected source."
         case .unsupportedSubtitle(let streamIndex, let codec):

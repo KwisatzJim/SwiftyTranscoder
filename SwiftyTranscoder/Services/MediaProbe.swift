@@ -3,17 +3,18 @@ import Foundation
 struct MediaProbe: Sendable {
     private let executableURL: URL
 
-    init(fileManager: FileManager = .default) throws {
-        let candidates = [
-            "/opt/homebrew/bin/ffprobe",
-            "/usr/local/bin/ffprobe"
-        ]
-
-        guard let path = candidates.first(where: fileManager.isExecutableFile(atPath:)) else {
+    init(
+        bundleURL: URL = Bundle.main.bundleURL,
+        fileManager: FileManager = .default
+    ) throws {
+        guard let executableURL = MediaToolLocator.executableURL(
+            for: .ffprobe,
+            bundleURL: bundleURL,
+            fileManager: fileManager
+        ) else {
             throw MediaProbeError.executableNotFound
         }
-
-        executableURL = URL(fileURLWithPath: path)
+        self.executableURL = executableURL
     }
 
     func inspect(_ sourceURL: URL) async throws -> MediaInspection {
@@ -87,7 +88,7 @@ enum MediaProbeError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .executableNotFound:
-            "ffprobe was not found in /opt/homebrew/bin or /usr/local/bin. Install FFmpeg before inspecting a video."
+            "The bundled ffprobe helper is unavailable, and no Homebrew development fallback was found. Reinstall SwiftyTranscoder."
         case .couldNotLaunch(let file, let reason):
             "Could not start ffprobe for \(file): \(reason)"
         case .probeFailed(let file, let exitCode, let reason):
