@@ -19,6 +19,7 @@ The source MKV is always read-only. Conversion is written to a clearly named `.p
 - Explain the exact unresolved safety requirement whenever approval or conversion is disabled.
 - Show progress, support safe cancellation, retain clearly labeled incomplete output, and offer confirmation-gated movement of that file to the macOS Trash.
 - Review and approve an entire batch before encoding, then process its files sequentially with overall progress, completion notifications, and sleep prevention.
+- Remove an unwanted source from a batch before encoding without deleting its file or discarding the other approved plans.
 - Refuse to overwrite existing output, verify aggregate destination free space, and block duplicate output paths before a batch starts.
 - Validate video profile, pixel format, color metadata, dimensions, frame rate, audio format, channel layout, bitrate, duration, and subtitle policy before completing a file.
 
@@ -72,7 +73,7 @@ The script refuses to replace an existing DMG for the current version. To delibe
 4. Choose an output folder and review the storage preflight.
 5. Turn protected +6 dB gain on or off.
 6. For one source, start the approved plan normally.
-7. For a multi-file queue, approve each plan before encoding begins. At the ready checkpoint, any queue row can be selected and reopened without losing the other approvals. Use the separate **Start Approved Batch** button to convert every approved source in order.
+7. For a multi-file queue, approve each plan before encoding begins. Before starting, an unwanted queue entry can be removed without changing its source file. At the ready checkpoint, any remaining row can be selected and reopened without losing the other approvals. Use the separate **Start Approved Batch** button to convert every approved source in order.
 8. Inspect or play the validated final MP4 files before removing the sources.
 
 After successful validation, **Show in Finder** opens the destination folder with the completed MP4 selected.

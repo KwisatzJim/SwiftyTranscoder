@@ -15,6 +15,7 @@ struct ContentView: View {
     @State private var isInspecting = false
     @State private var selectionError: String?
     @State private var notificationError: String?
+    @State private var queueIndexPendingRemoval: Int?
     @State private var gainEnabled = true
     @State private var aacStereoEnabled = false
     @State private var colorSelection = ColorSelection.needsConfirmation
@@ -100,6 +101,26 @@ struct ContentView: View {
         } message: {
             Text(notificationError ?? "Notifications could not be enabled.")
         }
+        .confirmationDialog(
+            "Remove this video from the batch?",
+            isPresented: Binding(
+                get: { queueIndexPendingRemoval != nil },
+                set: { if !$0 { queueIndexPendingRemoval = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Remove from Batch", role: .destructive) {
+                if let index = queueIndexPendingRemoval {
+                    removeQueueItem(at: index)
+                }
+                queueIndexPendingRemoval = nil
+            }
+            Button("Keep Video", role: .cancel) {
+                queueIndexPendingRemoval = nil
+            }
+        } message: {
+            Text(queueRemovalMessage)
+        }
         .onChange(of: conversionController.phase) { _, phase in
             handleConversionPhaseChange(phase)
         }
@@ -109,15 +130,25 @@ struct ContentView: View {
         GroupBox {
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(Array(sourceQueue.enumerated()), id: \.offset) { index, source in
-                    if isBatchReady {
-                        Button {
-                            selectApprovedPlan(at: index)
-                        } label: {
+                    HStack(spacing: 8) {
+                        if isBatchReady {
+                            Button {
+                                selectApprovedPlan(at: index)
+                            } label: {
+                                queueRow(index: index, source: source)
+                            }
+                            .buttonStyle(.plain)
+                        } else {
                             queueRow(index: index, source: source)
                         }
-                        .buttonStyle(.plain)
-                    } else {
-                        queueRow(index: index, source: source)
+                        Button(role: .destructive) {
+                            queueIndexPendingRemoval = index
+                        } label: {
+                            Image(systemName: "minus.circle")
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Remove \(source.lastPathComponent) from this batch")
+                        .disabled(isBatchRunning || conversionController.isActive)
                     }
                 }
                 Divider()
@@ -187,6 +218,54 @@ struct ContentView: View {
 
     private func isCompletedQueueItem(_ index: Int) -> Bool {
         completedQueueIndexes.contains(index)
+    }
+
+    private var queueRemovalMessage: String {
+        guard let index = queueIndexPendingRemoval, sourceQueue.indices.contains(index) else {
+            return "The source file will not be changed or deleted."
+        }
+        return "\(sourceQueue[index].lastPathComponent) will leave this batch. The source file will not be changed or deleted."
+    }
+
+    private func removeQueueItem(at index: Int) {
+        guard !isBatchRunning, !conversionController.isActive,
+              sourceQueue.count > 1, sourceQueue.indices.contains(index) else { return }
+
+        sourceQueue.remove(at: index)
+        approvedPlans = Dictionary(uniqueKeysWithValues: approvedPlans.compactMap { oldIndex, plan in
+            guard oldIndex != index else { return nil }
+            return (oldIndex > index ? oldIndex - 1 : oldIndex, plan)
+        })
+        completedQueueIndexes = Set(completedQueueIndexes.compactMap { oldIndex in
+            guard oldIndex != index else { return nil }
+            return oldIndex > index ? oldIndex - 1 : oldIndex
+        })
+
+        if sourceQueue.count == 1 {
+            let remainingPlan = approvedPlans[0]
+            approvedPlans = [:]
+            isBatchReady = false
+            currentQueueIndex = 0
+            if let remainingPlan {
+                restoreApprovedPlan(remainingPlan)
+            } else {
+                loadSource(sourceQueue[0])
+            }
+            return
+        }
+
+        if currentQueueIndex > index {
+            currentQueueIndex -= 1
+        } else if currentQueueIndex == index {
+            currentQueueIndex = min(index, sourceQueue.count - 1)
+        }
+
+        isBatchReady = approvedPlans.count == sourceQueue.count
+        if isBatchReady, let plan = approvedPlans[currentQueueIndex] {
+            restoreApprovedPlan(plan)
+        } else if selectedSource.map({ !sourceQueue.contains($0) }) ?? true {
+            loadSource(sourceQueue[currentQueueIndex])
+        }
     }
 
     private func selectedFileView(_ url: URL) -> some View {
@@ -532,6 +611,10 @@ struct ContentView: View {
     private func selectApprovedPlan(at index: Int) {
         guard isBatchReady, let approved = approvedPlans[index] else { return }
         currentQueueIndex = index
+        restoreApprovedPlan(approved)
+    }
+
+    private func restoreApprovedPlan(_ approved: ApprovedConversion) {
         selectedSource = approved.sourceURL
         inspection = approved.inspection
         outputURL = approved.outputURL
