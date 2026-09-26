@@ -16,6 +16,7 @@ The source MKV is always read-only. Conversion is written to a clearly named `.p
 - Select explicit forced-English SubRip tracks without confusing them with SDH tracks.
 - For foreign-language audio, prefer a complete ordinary English subtitle over English SDH and burn the visible choice into the video.
 - Require explicit confirmation before treating missing color metadata as SDR and tagging the output as limited-range BT.709.
+- Explain the exact unresolved safety requirement whenever approval or conversion is disabled.
 - Show progress, support safe cancellation, retain clearly labeled incomplete output, and offer confirmation-gated movement of that file to the macOS Trash.
 - Review and approve an entire batch before encoding, then process its files sequentially with overall progress, completion notifications, and sleep prevention.
 - Refuse to overwrite existing output, verify aggregate destination free space, and block duplicate output paths before a batch starts.

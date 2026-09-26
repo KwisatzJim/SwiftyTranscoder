@@ -218,7 +218,9 @@ struct ContentView: View {
     }
 
     private func inspectionSummary(_ inspection: MediaInspection, sourceURL: URL) -> some View {
-        VStack(spacing: 14) {
+        let conversionBlockingReason = conversionBlockingReason(inspection: inspection)
+
+        return VStack(spacing: 14) {
             HumanReadableAnalysisView(inspection: inspection)
 
             ConversionPlanView(
@@ -251,8 +253,9 @@ struct ContentView: View {
 
             VideoConversionControlsView(
                 controller: conversionController,
-                canStart: canStartVideoConversion(inspection: inspection)
+                canStart: conversionBlockingReason == nil
                     && (!isBatchReady || batchHasSufficientSpace && duplicateBatchOutputURLs.isEmpty),
+                disabledReason: conversionBlockingReason,
                 startButtonTitle: startButtonTitle,
                 batchItemNumber: isBatchRunning ? currentQueueIndex + 1 : nil,
                 batchItemCount: sourceQueue.count,
@@ -422,17 +425,22 @@ struct ContentView: View {
         defaultSubtitleMode = subtitleSelection == .omit ? "omit" : "recommended"
     }
 
-    private func canStartVideoConversion(inspection: MediaInspection) -> Bool {
-        guard !conversionController.isActive else { return false }
-        return (try? VideoConversionCommand(
-            sourceURL: selectedSource ?? URL(fileURLWithPath: "/"),
-            outputURL: outputURL,
-            inspection: inspection,
-            gainEnabled: gainEnabled,
-            aacStereoEnabled: aacStereoEnabled,
-            colorSelection: colorSelection,
-            subtitleSelection: subtitleSelection
-        )) != nil
+    private func conversionBlockingReason(inspection: MediaInspection) -> String? {
+        guard !conversionController.isActive else { return nil }
+        do {
+            _ = try VideoConversionCommand(
+                sourceURL: selectedSource ?? URL(fileURLWithPath: "/"),
+                outputURL: outputURL,
+                inspection: inspection,
+                gainEnabled: gainEnabled,
+                aacStereoEnabled: aacStereoEnabled,
+                colorSelection: colorSelection,
+                subtitleSelection: subtitleSelection
+            )
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
     }
 
     private var existingPartialOutput: URL? {

@@ -4,6 +4,7 @@ import SwiftUI
 struct VideoConversionControlsView: View {
     @ObservedObject var controller: VideoConversionController
     let canStart: Bool
+    let disabledReason: String?
     let startButtonTitle: String
     let batchItemNumber: Int?
     let batchItemCount: Int
@@ -20,6 +21,11 @@ struct VideoConversionControlsView: View {
                 Button(startButtonTitle, systemImage: "checkmark.circle", action: start)
                     .buttonStyle(.borderedProminent)
                     .disabled(!canStart)
+                if !canStart, let disabledReason {
+                    Label(disabledReason, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
                 if let existingPartialOutput {
                     VStack(spacing: 5) {
                         Label("Incomplete output found", systemImage: "exclamationmark.triangle.fill")
