@@ -34,6 +34,7 @@ struct MediaStream: Decodable, Identifiable, Sendable {
     let disposition: StreamDisposition?
 
     var id: Int { index }
+    var subtitleEvidence: SubtitleTrackEvidence? { SubtitleTrackEvidence(stream: self) }
 
     enum CodingKeys: String, CodingKey {
         case index, profile, width, height, channels, tags, disposition

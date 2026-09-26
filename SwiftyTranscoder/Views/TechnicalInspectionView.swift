@@ -109,13 +109,26 @@ struct TechnicalInspectionView: View {
         if stream.disposition?.forced == 1 { details.append("forced") }
         if stream.disposition?.isDefault == 1 { details.append("default") }
         if stream.disposition?.hearingImpaired == 1 { details.append("hearing impaired") }
+        if let evidence = stream.subtitleEvidence {
+            if let eventCount = evidence.eventCount {
+                details.append("\(eventCount) subtitle events")
+            }
+            if let trackSpan = formattedTimeInterval(evidence.trackSpanSeconds) {
+                details.append("track span \(trackSpan)")
+            }
+        }
 
         return details.isEmpty ? "No additional metadata" : details.joined(separator: " · ")
     }
 
     private func formattedDuration(_ value: String?) -> String? {
         guard let value, let seconds = Double(value) else { return nil }
-        let totalSeconds = Int(seconds.rounded())
+        return formattedTimeInterval(seconds)
+    }
+
+    private func formattedTimeInterval(_ value: TimeInterval?) -> String? {
+        guard let value, value.isFinite, value >= 0 else { return nil }
+        let totalSeconds = Int(value.rounded())
         return String(
             format: "%d:%02d:%02d",
             totalSeconds / 3_600,
