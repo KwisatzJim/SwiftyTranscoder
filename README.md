@@ -125,6 +125,8 @@ The conversion plan can remember gain and subtitle-policy defaults across source
 - Likely-forced analysis depends on trustworthy Matroska subtitle statistics. Missing, malformed, lone, or ambiguous statistical evidence produces no recommendation.
 - The app currently depends on separately installed Homebrew tools and is not yet a self-contained distributable build.
 
+The self-contained distribution design is documented in `Documentation/Milestone-52.md`. It calls for a purpose-built, narrowly scoped FFmpeg toolchain rather than copying Homebrew's large dependency tree. The existing executable lookup remains unchanged until the staged tools pass capability, media, linkage, signing, and clean-machine tests.
+
 ## Plex validation
 
 Representative outputs have been tested through Plex:
