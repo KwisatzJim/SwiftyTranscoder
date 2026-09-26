@@ -1,34 +1,5 @@
 import Foundation
 
-struct CompatibilityAudioSettings: Sendable {
-    let channels: Int
-    let acceptedLayouts: Set<String>
-    let bitRate: String
-    let description: String
-
-    init?(source: MediaStream) {
-        switch (source.channels, source.channelLayout) {
-        case (1, "mono"):
-            channels = 1
-            acceptedLayouts = ["mono"]
-            bitRate = "96000"
-            description = "mono at 96 kb/s"
-        case (2, "stereo"):
-            channels = 2
-            acceptedLayouts = ["stereo"]
-            bitRate = "192000"
-            description = "stereo at 192 kb/s"
-        case (6, "5.1"), (6, "5.1(side)"):
-            channels = 6
-            acceptedLayouts = ["5.1", "5.1(side)"]
-            bitRate = "224000"
-            description = "5.1 at 224 kb/s"
-        default:
-            return nil
-        }
-    }
-}
-
 struct DestinationSpaceCheck: Sendable {
     let availableBytes: Int64
     let requiredBytes: Int64
@@ -38,15 +9,13 @@ struct DestinationSpaceCheck: Sendable {
     static func evaluate(inspection: MediaInspection, outputURL: URL) -> DestinationSpaceCheck? {
         guard let sizeText = inspection.format.size,
               let sourceBytes = Int64(sizeText) else { return nil }
-        let reserve = max(sourceBytes / 2, 1_073_741_824)
-        let requiredBytes = sourceBytes.addingReportingOverflow(reserve)
-        guard !requiredBytes.overflow,
+        guard let requiredBytes = DestinationStorageRequirement.requiredBytes(forSourceBytes: sourceBytes),
               let availableBytes = try? outputURL.deletingLastPathComponent()
                 .resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
                 .volumeAvailableCapacityForImportantUsage else { return nil }
         return DestinationSpaceCheck(
             availableBytes: availableBytes,
-            requiredBytes: requiredBytes.partialValue
+            requiredBytes: requiredBytes
         )
     }
 

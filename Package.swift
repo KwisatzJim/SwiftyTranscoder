@@ -9,13 +9,7 @@ let package = Package(
         .target(
             name: "SwiftyTranscoderCore",
             path: "SwiftyTranscoder/Models",
-            exclude: [
-                "ConversionPlan.swift",
-                "MediaInspection.swift",
-                "MediaSummary.swift",
-                "SubtitleRecommendation.swift"
-            ],
-            sources: ["CanonicalOutputPath.swift", "QueueIndexRemapping.swift"]
+            exclude: ["ConversionPlan.swift"]
         ),
         .testTarget(
             name: "SwiftyTranscoderCoreTests",
