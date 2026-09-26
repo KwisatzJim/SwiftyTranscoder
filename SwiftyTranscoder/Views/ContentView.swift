@@ -50,23 +50,29 @@ struct ContentView: View {
     ]
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                wizardHeader
+        ScrollViewReader { scrollProxy in
+            ScrollView {
+                VStack(spacing: 16) {
+                    wizardHeader
+                        .id("wizardTop")
 
-                switch wizardStep {
-                case .choose:
-                    chooseStep
-                case .review:
-                    reviewStep
-                case .plan:
-                    planStep
-                case .convert:
-                    convertStep
+                    switch wizardStep {
+                    case .choose:
+                        chooseStep
+                    case .review:
+                        reviewStep
+                    case .plan:
+                        planStep
+                    case .convert:
+                        convertStep
+                    }
                 }
+                .padding(32)
+                .frame(maxWidth: .infinity)
             }
-            .padding(32)
-            .frame(maxWidth: .infinity)
+            .onChange(of: wizardStep) { _, _ in
+                scrollProxy.scrollTo("wizardTop", anchor: .top)
+            }
         }
         .frame(minWidth: 560, minHeight: 360)
         .fileImporter(
