@@ -313,8 +313,16 @@ struct ContentView: View {
         GroupBox {
             VStack(alignment: .leading, spacing: 6) {
                 if sourceQueue.count > 5 {
-                    ScrollView {
-                        sourceQueueRows
+                    ScrollViewReader { queueProxy in
+                        ScrollView {
+                            sourceQueueRows
+                        }
+                        .onChange(of: currentQueueIndex) { _, index in
+                            queueProxy.scrollTo(index, anchor: .center)
+                        }
+                        .onAppear {
+                            queueProxy.scrollTo(currentQueueIndex, anchor: .center)
+                        }
                     }
                     .frame(height: 142)
                 } else {
@@ -370,6 +378,7 @@ struct ContentView: View {
                     .accessibilityHint("Asks for confirmation and does not delete the source file")
                     .disabled(isBatchRunning || conversionController.isActive)
                 }
+                .id(index)
             }
         }
     }
