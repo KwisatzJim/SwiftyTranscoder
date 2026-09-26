@@ -165,15 +165,26 @@ struct ContentView: View {
 
     private var chooseStep: some View {
         VStack(spacing: 18) {
-            Text("Choose one or more MKV or MP4 files to begin. Sources will only be read.")
+            Text(selectedSource == nil
+                ? "Choose one or more MKV or MP4 files to begin. Sources will only be read."
+                : "Choose a replacement selection, or return to the videos already loaded."
+            )
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 420)
 
-            Button("Choose Videos…", systemImage: "folder") {
-                isChoosingSource = true
+            HStack {
+                if selectedSource != nil {
+                    Button("Return to Current Batch", systemImage: "arrow.left") {
+                        wizardStep = .review
+                    }
+                }
+
+                Button(selectedSource == nil ? "Choose Videos…" : "Choose Different Videos…", systemImage: "folder") {
+                    isChoosingSource = true
+                }
+                .buttonStyle(.borderedProminent)
             }
-            .buttonStyle(.borderedProminent)
         }
         .padding(.vertical, 28)
     }
