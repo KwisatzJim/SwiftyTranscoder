@@ -138,6 +138,10 @@ struct ContentView: View {
                                 queueRow(index: index, source: source)
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel(
+                                "Review \(source.lastPathComponent), \(queueStatus(for: index))"
+                            )
+                            .accessibilityHint("Shows this approved conversion plan")
                         } else {
                             queueRow(index: index, source: source)
                         }
@@ -148,6 +152,8 @@ struct ContentView: View {
                         }
                         .buttonStyle(.borderless)
                         .help("Remove \(source.lastPathComponent) from this batch")
+                        .accessibilityLabel("Remove \(source.lastPathComponent) from batch")
+                        .accessibilityHint("Asks for confirmation and does not delete the source file")
                         .disabled(isBatchRunning || conversionController.isActive)
                     }
                 }
@@ -176,6 +182,7 @@ struct ContentView: View {
         HStack(spacing: 8) {
             Image(systemName: queueIcon(for: index))
                 .foregroundStyle(queueColor(for: index))
+                .accessibilityHidden(true)
             Text(source.lastPathComponent)
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -186,6 +193,8 @@ struct ContentView: View {
         }
         .contentShape(Rectangle())
         .font(index == currentQueueIndex ? .body.weight(.semibold) : .body)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(source.lastPathComponent), \(queueStatus(for: index))")
     }
 
     private func queueIcon(for index: Int) -> String {
