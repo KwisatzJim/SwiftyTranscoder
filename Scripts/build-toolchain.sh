@@ -12,21 +12,21 @@ work_root="$project_root/.build/toolchain"
 archive="$work_root/ffmpeg-${ffmpeg_version}.tar.xz"
 source_dir="$work_root/ffmpeg-${ffmpeg_version}"
 install_dir="$work_root/stage"
+dependency_dir="$work_root/dependencies"
 deployment_target="14.0"
 
-for tool in curl shasum tar make clang pkg-config; do
+for tool in curl shasum tar make clang pkg-config otool; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echo "Required build tool is missing: $tool" >&2
         exit 1
     fi
 done
 
-if ! pkg-config --exists libass; then
-    echo "This proof build requires libass development files discoverable by pkg-config." >&2
-    exit 1
-fi
-
 mkdir -p "$work_root"
+
+"$script_dir/build-subtitle-dependencies.sh"
+export PKG_CONFIG_LIBDIR="$dependency_dir/lib/pkgconfig:$dependency_dir/share/pkgconfig"
+export PKG_CONFIG_PATH=
 
 if [[ ! -f "$archive" ]]; then
     echo "Downloading FFmpeg ${ffmpeg_version} source…"
@@ -58,8 +58,8 @@ echo "Configuring the narrow FFmpeg toolchain…"
     --cc=clang \
     --arch=arm64 \
     --target-os=darwin \
-    --extra-cflags="-mmacosx-version-min=$deployment_target" \
-    --extra-ldflags="-mmacosx-version-min=$deployment_target -Wl,-headerpad_max_install_names" \
+    --extra-cflags="-I$dependency_dir/include -mmacosx-version-min=$deployment_target" \
+    --extra-ldflags="-L$dependency_dir/lib -lc++ -mmacosx-version-min=$deployment_target -Wl,-headerpad_max_install_names" \
     --disable-debug \
     --disable-doc \
     --disable-network \
@@ -67,6 +67,7 @@ echo "Configuring the narrow FFmpeg toolchain…"
     --disable-everything \
     --disable-shared \
     --enable-static \
+    --pkg-config-flags=--static \
     --enable-ffmpeg \
     --enable-ffprobe \
     --enable-avcodec \
@@ -107,10 +108,17 @@ test -x "$ffprobe_bin"
 "$ffmpeg_bin" -hide_banner -version | grep -q 'configuration:.*--disable-network.*--disable-everything.*--enable-libass'
 "$ffmpeg_bin" -hide_banner -L | grep -q 'GNU Lesser General Public'
 
+for helper in "$ffmpeg_bin" "$ffprobe_bin"; do
+    if otool -L "$helper" | awk 'NR > 1 { print $1 }' | grep -Eq '^(/opt/homebrew|/usr/local)/'; then
+        echo "A build-machine library path remains in $helper:" >&2
+        otool -L "$helper" >&2
+        exit 1
+    fi
+done
+
 echo ""
 echo "Staged toolchain is ready:"
 echo "  $ffmpeg_bin"
 echo "  $ffprobe_bin"
 echo ""
-echo "This proof build still links libass and its dependencies from Homebrew."
-echo "Those libraries will be staged and rewritten in a later packaging step."
+echo "libass and its subtitle dependencies are statically included."

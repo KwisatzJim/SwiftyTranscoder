@@ -88,10 +88,6 @@ while :; do
     esac
 done
 
-for helper in "$helpers_dir/ffmpeg" "$helpers_dir/ffprobe"; do
-    install_name_tool -add_rpath '@executable_path/../Frameworks' "$helper"
-done
-
 echo "Checking rewritten linkage…"
 while IFS= read -r item; do
     if otool -L "$item" | awk 'NR > 1 { print $1 }' | grep -Eq '^(/opt/homebrew|/usr/local)/'; then
@@ -119,12 +115,6 @@ DYLD_PRINT_LIBRARIES=1 "$helpers_dir/ffprobe" -hide_banner -version \
 
 if grep -Eq '^dyld.*(/opt/homebrew|/usr/local)/' "$runtime_log"; then
     echo "The bundled ffprobe loaded a library from Homebrew:" >&2
-    cat "$runtime_log" >&2
-    exit 1
-fi
-
-if ! grep -q "$frameworks_dir/libass" "$runtime_log"; then
-    echo "The runtime check did not load the staged libass library." >&2
     cat "$runtime_log" >&2
     exit 1
 fi
