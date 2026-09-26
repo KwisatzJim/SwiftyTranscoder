@@ -14,6 +14,7 @@ The source MKV is always read-only. Conversion is written to a clearly named `.p
 - Preserve mono, stereo, or 5.1 channel layout while creating Plex-friendly 48 kHz AC-3 audio.
 - Apply optional +6 dB gain with peak protection. Gain is visible and enabled by default.
 - Select explicit forced-English SubRip tracks without confusing them with SDH tracks.
+- When forced metadata is missing, show a confirmation-only likely-forced recommendation if one short English SubRip track is clearly sparse compared with a fuller English track.
 - For foreign-language audio, prefer a complete ordinary English subtitle over English SDH and burn the visible choice into the video.
 - Require explicit confirmation before treating missing color metadata as SDR and tagging the output as limited-range BT.709.
 - Explain the exact unresolved safety requirement whenever approval or conversion is disabled.
@@ -121,6 +122,7 @@ The conversion plan can remember gain and subtitle-policy defaults across source
 - MP4/M4V audio-only processing cannot burn subtitles because that would require video re-encoding.
 - Every queued plan must be reviewed and approved before unattended batch conversion begins. A failure or cancellation stops the batch.
 - Automatic crop detection, restoration filters, AI upscaling, and broad encoder controls are deferred.
+- Likely-forced analysis depends on trustworthy Matroska subtitle statistics. Missing, malformed, lone, or ambiguous statistical evidence produces no recommendation.
 - The app currently depends on separately installed Homebrew tools and is not yet a self-contained distributable build.
 
 ## Plex validation
