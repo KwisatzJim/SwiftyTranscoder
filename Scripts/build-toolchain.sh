@@ -12,6 +12,7 @@ work_root="$project_root/.build/toolchain"
 archive="$work_root/ffmpeg-${ffmpeg_version}.tar.xz"
 source_dir="$work_root/ffmpeg-${ffmpeg_version}"
 install_dir="$work_root/stage"
+deployment_target="14.0"
 
 for tool in curl shasum tar make clang pkg-config; do
     if ! command -v "$tool" >/dev/null 2>&1; then
@@ -49,6 +50,7 @@ mkdir -p "$install_dir"
 
 cd "$source_dir"
 make distclean >/dev/null 2>&1 || true
+export MACOSX_DEPLOYMENT_TARGET="$deployment_target"
 
 echo "Configuring the narrow FFmpeg toolchain…"
 ./configure \
@@ -56,6 +58,8 @@ echo "Configuring the narrow FFmpeg toolchain…"
     --cc=clang \
     --arch=arm64 \
     --target-os=darwin \
+    --extra-cflags="-mmacosx-version-min=$deployment_target" \
+    --extra-ldflags="-mmacosx-version-min=$deployment_target -Wl,-headerpad_max_install_names" \
     --disable-debug \
     --disable-doc \
     --disable-network \
