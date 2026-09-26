@@ -295,53 +295,73 @@ struct ContentView: View {
     private var sourceQueueView: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 6) {
-                ForEach(Array(sourceQueue.enumerated()), id: \.offset) { index, source in
-                    HStack(spacing: 8) {
-                        if approvedPlans[index] != nil && !isBatchRunning {
-                            Button {
-                                selectApprovedPlan(at: index)
-                            } label: {
-                                queueRow(index: index, source: source)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(
-                                "Review \(source.lastPathComponent), \(queueStatus(for: index))"
-                            )
-                            .accessibilityHint("Shows this approved conversion plan")
-                        } else {
-                            queueRow(index: index, source: source)
-                        }
-                        Button(role: .destructive) {
-                            queueIndexPendingRemoval = index
-                        } label: {
-                            Image(systemName: "minus.circle")
-                        }
-                        .buttonStyle(.borderless)
-                        .help("Remove \(source.lastPathComponent) from this batch")
-                        .accessibilityLabel("Remove \(source.lastPathComponent) from batch")
-                        .accessibilityHint("Asks for confirmation and does not delete the source file")
-                        .disabled(isBatchRunning || conversionController.isActive)
+                if sourceQueue.count > 5 {
+                    ScrollView {
+                        sourceQueueRows
                     }
+                    .frame(height: 142)
+                } else {
+                    sourceQueueRows
                 }
-                Divider()
-                Toggle(
-                    "Notify when this batch finishes or stops",
-                    isOn: Binding(
-                        get: { batchNotificationsEnabled },
-                        set: setBatchNotificationsEnabled
+
+                if wizardStep == .convert {
+                    Divider()
+                    Toggle(
+                        "Notify when this batch finishes or stops",
+                        isOn: Binding(
+                            get: { batchNotificationsEnabled },
+                            set: setBatchNotificationsEnabled
+                        )
                     )
-                )
-                .disabled(isBatchRunning)
+                    .disabled(isBatchRunning)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         } label: {
-            Label(
-                "Source queue · \(completedQueueCount) of \(sourceQueue.count) completed",
-                systemImage: "list.number"
-            )
+            Label(queueHeading, systemImage: "list.number")
                 .font(.headline)
         }
         .frame(maxWidth: 760)
+    }
+
+    private var sourceQueueRows: some View {
+        LazyVStack(alignment: .leading, spacing: 6) {
+            ForEach(Array(sourceQueue.enumerated()), id: \.offset) { index, source in
+                HStack(spacing: 8) {
+                    if approvedPlans[index] != nil && !isBatchRunning {
+                        Button {
+                            selectApprovedPlan(at: index)
+                        } label: {
+                            queueRow(index: index, source: source)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            "Review \(source.lastPathComponent), \(queueStatus(for: index))"
+                        )
+                        .accessibilityHint("Shows this approved conversion plan")
+                    } else {
+                        queueRow(index: index, source: source)
+                    }
+                    Button(role: .destructive) {
+                        queueIndexPendingRemoval = index
+                    } label: {
+                        Image(systemName: "minus.circle")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Remove \(source.lastPathComponent) from this batch")
+                    .accessibilityLabel("Remove \(source.lastPathComponent) from batch")
+                    .accessibilityHint("Asks for confirmation and does not delete the source file")
+                    .disabled(isBatchRunning || conversionController.isActive)
+                }
+            }
+        }
+    }
+
+    private var queueHeading: String {
+        if isBatchRunning || !completedQueueIndexes.isEmpty {
+            return "Source queue · \(completedQueueCount) of \(sourceQueue.count) completed"
+        }
+        return "Source queue · \(approvedPlans.count) of \(sourceQueue.count) approved"
     }
 
     private func queueRow(index: Int, source: URL) -> some View {
