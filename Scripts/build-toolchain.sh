@@ -91,6 +91,10 @@ echo "Building FFmpeg ${ffmpeg_version}…"
 make -j"$(sysctl -n hw.logicalcpu)"
 make install
 
+mkdir -p "$install_dir/share/licenses/ffmpeg"
+cp "$source_dir/COPYING.LGPLv2.1" "$install_dir/share/licenses/ffmpeg/"
+cp "$source_dir/LICENSE.md" "$install_dir/share/licenses/ffmpeg/"
+
 echo "Verifying required capabilities…"
 ffmpeg_bin="$install_dir/bin/ffmpeg"
 ffprobe_bin="$install_dir/bin/ffprobe"

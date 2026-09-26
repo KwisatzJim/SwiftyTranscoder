@@ -55,6 +55,7 @@
 				A10000000000000000000008 /* Sources */,
 				A10000000000000000000003 /* Frameworks */,
 				A10000000000000000000009 /* Resources */,
+				A10000000000000000000010 /* Embed Toolchain */,
 			);
 			buildRules = (
 			);
@@ -113,6 +114,43 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A10000000000000000000010 /* Embed Toolchain */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/.build/toolchain/bundle/SwiftyTranscoderToolchain/Contents/Helpers/ffmpeg",
+				"$(SRCROOT)/.build/toolchain/bundle/SwiftyTranscoderToolchain/Contents/Helpers/ffprobe",
+				"$(SRCROOT)/.build/toolchain/dependencies/share/licenses/freetype/LICENSE.TXT",
+				"$(SRCROOT)/.build/toolchain/dependencies/share/licenses/fribidi/COPYING",
+				"$(SRCROOT)/.build/toolchain/dependencies/share/licenses/harfbuzz/COPYING",
+				"$(SRCROOT)/.build/toolchain/dependencies/share/licenses/libass/COPYING",
+				"$(SRCROOT)/.build/toolchain/stage/share/licenses/ffmpeg/COPYING.LGPLv2.1",
+				"$(SRCROOT)/.build/toolchain/stage/share/licenses/ffmpeg/LICENSE.md",
+			);
+			name = "Embed Toolchain";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/ffmpeg",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/ffprobe",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/ThirdPartyNotices/FreeType-LICENSE.txt",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/ThirdPartyNotices/FriBidi-COPYING.txt",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/ThirdPartyNotices/HarfBuzz-COPYING.txt",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/ThirdPartyNotices/libass-COPYING.txt",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/ThirdPartyNotices/FFmpeg-COPYING.LGPLv2.1.txt",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/ThirdPartyNotices/FFmpeg-LICENSE.md",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "\"$SRCROOT/Scripts/embed-toolchain.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		A10000000000000000000008 /* Sources */ = {

@@ -44,6 +44,10 @@ trap cleanup EXIT
 
 cd "$project_root"
 
+echo "Preparing the self-contained media toolchain…"
+"$script_dir/build-toolchain.sh"
+"$script_dir/stage-toolchain-bundle.sh"
+
 echo "Building SwiftyTranscoder Release configuration…"
 xcodebuild \
     -quiet \
