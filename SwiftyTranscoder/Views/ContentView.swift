@@ -232,14 +232,8 @@ struct ContentView: View {
               sourceQueue.count > 1, sourceQueue.indices.contains(index) else { return }
 
         sourceQueue.remove(at: index)
-        approvedPlans = Dictionary(uniqueKeysWithValues: approvedPlans.compactMap { oldIndex, plan in
-            guard oldIndex != index else { return nil }
-            return (oldIndex > index ? oldIndex - 1 : oldIndex, plan)
-        })
-        completedQueueIndexes = Set(completedQueueIndexes.compactMap { oldIndex in
-            guard oldIndex != index else { return nil }
-            return oldIndex > index ? oldIndex - 1 : oldIndex
-        })
+        approvedPlans = QueueIndexRemapping.remap(approvedPlans, removing: index)
+        completedQueueIndexes = QueueIndexRemapping.remap(completedQueueIndexes, removing: index)
 
         if sourceQueue.count == 1 {
             let remainingPlan = approvedPlans[0]
@@ -254,11 +248,11 @@ struct ContentView: View {
             return
         }
 
-        if currentQueueIndex > index {
-            currentQueueIndex -= 1
-        } else if currentQueueIndex == index {
-            currentQueueIndex = min(index, sourceQueue.count - 1)
-        }
+        currentQueueIndex = QueueIndexRemapping.currentIndex(
+            currentQueueIndex,
+            removing: index,
+            remainingCount: sourceQueue.count
+        )
 
         isBatchReady = approvedPlans.count == sourceQueue.count
         if isBatchReady, let plan = approvedPlans[currentQueueIndex] {
