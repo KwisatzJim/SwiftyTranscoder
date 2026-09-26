@@ -4,18 +4,15 @@ struct TechnicalInspectionView: View {
     let inspection: MediaInspection
 
     var body: some View {
-        DisclosureGroup("Technical details") {
-            VStack(alignment: .leading, spacing: 14) {
-                containerSection
-                streamSection("Video", streams: inspection.videoStreams)
-                streamSection("Audio", streams: inspection.audioStreams)
-                streamSection("Subtitles", streams: inspection.subtitleStreams)
-                chapterSection
-                streamSection("Attachments", streams: inspection.attachmentStreams)
-            }
-            .padding(.top, 10)
+        VStack(alignment: .leading, spacing: 14) {
+            containerSection
+            streamSection("Video", streams: inspection.videoStreams)
+            streamSection("Audio", streams: inspection.audioStreams)
+            streamSection("Subtitles", streams: inspection.subtitleStreams)
+            chapterSection
+            streamSection("Attachments", streams: inspection.attachmentStreams)
         }
-        .frame(maxWidth: 650)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var containerSection: some View {
