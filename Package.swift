@@ -15,7 +15,7 @@ let package = Package(
                 "MediaSummary.swift",
                 "SubtitleRecommendation.swift"
             ],
-            sources: ["QueueIndexRemapping.swift"]
+            sources: ["CanonicalOutputPath.swift", "QueueIndexRemapping.swift"]
         ),
         .testTarget(
             name: "SwiftyTranscoderCoreTests",

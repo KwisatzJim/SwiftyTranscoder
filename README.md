@@ -53,7 +53,7 @@ xcodebuild \
   build
 ```
 
-Run the Foundation-only queue-state regression tests with:
+Run the Foundation-only queue-state and duplicate-path regression tests with:
 
 ```fish
 swift test

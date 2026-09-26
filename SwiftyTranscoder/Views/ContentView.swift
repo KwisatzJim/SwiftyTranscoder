@@ -698,23 +698,13 @@ struct ContentView: View {
 
     private var duplicateBatchOutputURLs: [URL] {
         let grouped = Dictionary(grouping: approvedPlans.values) { approved in
-            canonicalOutputKey(approved.outputURL)
+            CanonicalOutputPath.key(for: approved.outputURL)
         }
         return grouped.values.compactMap { matches in
             guard matches.count > 1 else { return nil }
             return matches[0].outputURL
         }
         .sorted { $0.path(percentEncoded: false) < $1.path(percentEncoded: false) }
-    }
-
-    private func canonicalOutputKey(_ outputURL: URL) -> String {
-        outputURL.deletingLastPathComponent()
-            .resolvingSymlinksInPath()
-            .appendingPathComponent(outputURL.lastPathComponent)
-            .standardizedFileURL
-            .path(percentEncoded: false)
-            .precomposedStringWithCanonicalMapping
-            .lowercased()
     }
 
     private func startApprovedConversion(at index: Int) {
