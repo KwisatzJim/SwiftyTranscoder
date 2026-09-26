@@ -19,6 +19,7 @@ The source MKV is always read-only. Conversion is written to a clearly named `.p
 - Explain the exact unresolved safety requirement whenever approval or conversion is disabled.
 - Show progress, support safe cancellation, retain clearly labeled incomplete output, and offer confirmation-gated movement of that file to the macOS Trash.
 - Review and approve an entire batch before encoding, then process its files sequentially with overall progress, completion notifications, and sleep prevention.
+- Move through a focused four-step Choose, Review, Plan, and Convert wizard instead of placing the entire workflow on one long scrolling screen.
 - Remove an unwanted source from a batch before encoding without deleting its file or discarding the other approved plans.
 - Refuse to overwrite existing output, verify aggregate destination free space, and block duplicate output paths before a batch starts.
 - Validate video profile, pixel format, color metadata, dimensions, frame rate, audio format, channel layout, bitrate, duration, and subtitle policy before completing a file.
@@ -73,14 +74,14 @@ The script refuses to replace an existing DMG for the current version. To delibe
 
 ## Workflow
 
-1. Choose one or more MKV/MP4 sources.
-2. Review the current file's human-readable media summary and proposed conversion.
-3. Resolve any required color or subtitle decision.
-4. Choose an output folder and review the storage preflight.
-5. Turn protected +6 dB gain on or off.
-6. For one source, start the approved plan normally.
-7. For a multi-file queue, approve each plan before encoding begins. Before starting, an unwanted queue entry can be removed without changing its source file. At the ready checkpoint, any remaining row can be selected and reopened without losing the other approvals. Use the separate **Start Approved Batch** button to convert every approved source in order.
-8. Inspect or play the validated final MP4 files before removing the sources.
+1. On **Choose**, select one or more MKV/MP4 sources.
+2. On **Review**, read the current file's human-readable media summary. Technical stream details remain available in a disclosure section when needed.
+3. On **Plan**, resolve any required color or subtitle decision, choose an output folder, review the storage preflight, and turn protected +6 dB gain on or off.
+4. For one source, continue to **Convert** and start the approved plan normally.
+5. For a multi-file queue, approve each plan before encoding begins. The wizard returns to **Review** for each waiting video, and any earlier approved video can be revisited from the queue. Before starting, an unwanted queue entry can be removed without changing its source file. At the ready checkpoint, use the separate **Start Approved Batch** button to convert every approved source in order.
+6. On **Convert**, follow progress and ETA, then inspect or play the validated final MP4 files before removing the sources.
+
+The wizard returns to the top when changing steps, keeps the current video visible in long queues, and preserves the loaded batch if **Choose** is revisited accidentally.
 
 After successful validation, **Show in Finder** opens the destination folder with the completed MP4 selected.
 
