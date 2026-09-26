@@ -2,7 +2,25 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ContentView: View {
+    private enum WizardStep: Int, CaseIterable {
+        case choose
+        case review
+        case plan
+        case convert
+
+        var title: String {
+            switch self {
+            case .choose: "Choose"
+            case .review: "Review"
+            case .plan: "Plan"
+            case .convert: "Convert"
+            }
+        }
+    }
+
     @StateObject private var conversionController = VideoConversionController()
+    @State private var wizardStep = WizardStep.choose
+    @State private var technicalDetailsExpanded = false
     @State private var isChoosingSource = false
     @State private var sourceQueue: [URL] = []
     @State private var currentQueueIndex = 0
@@ -34,39 +52,18 @@ struct ContentView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-            Image(systemName: "film.stack")
-                .font(.system(size: 44, weight: .light))
-                .foregroundStyle(.tint)
-                .accessibilityHidden(true)
+                wizardHeader
 
-            VStack(spacing: 8) {
-                Text("SwiftyTranscoder")
-                    .font(.largeTitle.bold())
-
-                Text("A simpler path from MKV to Plex-friendly MP4.")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-            }
-            .multilineTextAlignment(.center)
-
-            if sourceQueue.count > 1 {
-                sourceQueueView
-            }
-
-            if let selectedSource {
-                selectedFileView(selectedSource)
-            } else {
-                Text("Choose one or more MKV or MP4 files to begin. Sources will only be read.")
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 420)
-            }
-
-                Button("Choose Videos…", systemImage: "folder") {
-                    isChoosingSource = true
+                switch wizardStep {
+                case .choose:
+                    chooseStep
+                case .review:
+                    reviewStep
+                case .plan:
+                    planStep
+                case .convert:
+                    convertStep
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(isInspecting || conversionController.isActive || isBatchRunning)
             }
             .padding(32)
             .frame(maxWidth: .infinity)
@@ -123,6 +120,155 @@ struct ContentView: View {
         }
         .onChange(of: conversionController.phase) { _, phase in
             handleConversionPhaseChange(phase)
+        }
+    }
+
+    private var wizardHeader: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "film.stack")
+                    .font(.system(size: 32, weight: .light))
+                    .foregroundStyle(.tint)
+
+                Text("SwiftyTranscoder")
+                    .font(.largeTitle.bold())
+            }
+
+            HStack(spacing: 8) {
+                ForEach(WizardStep.allCases, id: \.rawValue) { step in
+                    Label(step.title, systemImage: wizardIcon(for: step))
+                        .font(.callout.weight(step == wizardStep ? .semibold : .regular))
+                        .foregroundStyle(step.rawValue <= wizardStep.rawValue ? Color.accentColor : Color.secondary)
+
+                    if step != WizardStep.allCases.last {
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+        }
+        .multilineTextAlignment(.center)
+    }
+
+    private func wizardIcon(for step: WizardStep) -> String {
+        if step.rawValue < wizardStep.rawValue { return "checkmark.circle.fill" }
+        if step == wizardStep { return "circle.inset.filled" }
+        return "circle"
+    }
+
+    private var chooseStep: some View {
+        VStack(spacing: 18) {
+            Text("Choose one or more MKV or MP4 files to begin. Sources will only be read.")
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 420)
+
+            Button("Choose Videos…", systemImage: "folder") {
+                isChoosingSource = true
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(.vertical, 28)
+    }
+
+    @ViewBuilder
+    private var reviewStep: some View {
+        if let selectedSource {
+            VStack(spacing: 14) {
+                if sourceQueue.count > 1 {
+                    sourceQueueView
+                }
+                selectedSourceHeader(selectedSource)
+
+                if isInspecting {
+                    ProgressView("Reading media information…")
+                        .padding(.vertical, 24)
+                } else if let inspection {
+                    HumanReadableAnalysisView(inspection: inspection)
+
+                    DisclosureGroup("Technical details", isExpanded: $technicalDetailsExpanded) {
+                        TechnicalInspectionView(inspection: inspection)
+                            .padding(.top, 8)
+                    }
+                    .frame(maxWidth: 760)
+
+                    Text("Inspected read-only with ffprobe")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Button("Choose Different Videos") {
+                        wizardStep = .choose
+                    }
+                    Spacer()
+                    Button("Continue to Plan", systemImage: "arrow.right") {
+                        wizardStep = .plan
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(inspection == nil || isInspecting)
+                }
+                .frame(maxWidth: 760)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var planStep: some View {
+        if let selectedSource, let inspection {
+            VStack(spacing: 14) {
+                if sourceQueue.count > 1 {
+                    sourceQueueView
+                }
+                selectedSourceHeader(selectedSource)
+                conversionPlan(inspection, sourceURL: selectedSource)
+
+                HStack {
+                    Button("Back to Review", systemImage: "arrow.left") {
+                        wizardStep = .review
+                    }
+                    Spacer()
+                }
+                .frame(maxWidth: 760)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var convertStep: some View {
+        if let selectedSource, let inspection {
+            let blockingReason = conversionBlockingReason(inspection: inspection)
+
+            VStack(spacing: 14) {
+                if sourceQueue.count > 1 {
+                    sourceQueueView
+                }
+                selectedSourceHeader(selectedSource)
+
+                if isBatchReady {
+                    batchReadyView
+                }
+
+                VideoConversionControlsView(
+                    controller: conversionController,
+                    canStart: blockingReason == nil
+                        && (!isBatchReady || batchHasSufficientSpace && duplicateBatchOutputURLs.isEmpty),
+                    disabledReason: blockingReason,
+                    startButtonTitle: startButtonTitle,
+                    batchItemNumber: isBatchRunning ? currentQueueIndex + 1 : nil,
+                    batchItemCount: sourceQueue.count,
+                    completedBatchCount: completedQueueIndexes.count,
+                    existingPartialOutput: existingPartialOutput,
+                    start: { performPrimaryAction(sourceURL: selectedSource, inspection: inspection) }
+                )
+
+                if !conversionController.isActive && !isBatchRunning {
+                    Button("Choose More Videos…", systemImage: "folder") {
+                        isChoosingSource = true
+                    }
+                }
+            }
         }
     }
 
@@ -271,7 +417,7 @@ struct ContentView: View {
         }
     }
 
-    private func selectedFileView(_ url: URL) -> some View {
+    private func selectedSourceHeader(_ url: URL) -> some View {
         VStack(spacing: 6) {
             Label("Selected source", systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green)
@@ -287,24 +433,14 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
-
-            if isInspecting {
-                ProgressView("Reading media information…")
-                    .padding(.top, 10)
-            } else if let inspection {
-                inspectionSummary(inspection, sourceURL: url)
-                    .padding(.top, 10)
-            }
         }
         .frame(maxWidth: 780)
     }
 
-    private func inspectionSummary(_ inspection: MediaInspection, sourceURL: URL) -> some View {
+    private func conversionPlan(_ inspection: MediaInspection, sourceURL: URL) -> some View {
         let conversionBlockingReason = conversionBlockingReason(inspection: inspection)
 
         return VStack(spacing: 14) {
-            HumanReadableAnalysisView(inspection: inspection)
-
             ConversionPlanView(
                 plan: ConversionPlan(
                     inspection: inspection,
@@ -329,28 +465,17 @@ struct ContentView: View {
             )
             .disabled(isBatchRunning || isBatchReady)
 
-            if isBatchReady {
-                batchReadyView
-            }
-
             VideoConversionControlsView(
                 controller: conversionController,
-                canStart: conversionBlockingReason == nil
-                    && (!isBatchReady || batchHasSufficientSpace && duplicateBatchOutputURLs.isEmpty),
+                canStart: conversionBlockingReason == nil,
                 disabledReason: conversionBlockingReason,
                 startButtonTitle: startButtonTitle,
-                batchItemNumber: isBatchRunning ? currentQueueIndex + 1 : nil,
+                batchItemNumber: nil,
                 batchItemCount: sourceQueue.count,
                 completedBatchCount: completedQueueIndexes.count,
                 existingPartialOutput: existingPartialOutput,
                 start: { performPrimaryAction(sourceURL: sourceURL, inspection: inspection) }
             )
-
-            TechnicalInspectionView(inspection: inspection)
-
-            Text("Inspected read-only with ffprobe")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
     }
 
@@ -378,6 +503,8 @@ struct ContentView: View {
             isBatchRunning = false
             guard let source = sourceQueue.first else { return }
             loadSource(source)
+            technicalDetailsExpanded = false
+            wizardStep = .review
 
         case .failure(let error):
             selectionError = error.localizedDescription
@@ -434,6 +561,7 @@ struct ContentView: View {
                 Button("Reopen Selected Plan", systemImage: "pencil") {
                     approvedPlans.removeValue(forKey: currentQueueIndex)
                     isBatchReady = false
+                    wizardStep = .plan
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -564,6 +692,7 @@ struct ContentView: View {
 
     private func approveOrStart(sourceURL: URL, inspection: MediaInspection) {
         guard sourceQueue.count > 1 else {
+            wizardStep = .convert
             startVideoConversion(sourceURL: sourceURL, inspection: inspection)
             return
         }
@@ -591,9 +720,12 @@ struct ContentView: View {
 
             if approvedPlans.count == sourceQueue.count {
                 isBatchReady = true
+                wizardStep = .convert
             } else if let nextIndex = nextUnapprovedIndex {
                 currentQueueIndex = nextIndex
                 loadSource(sourceQueue[nextIndex])
+                technicalDetailsExpanded = false
+                wizardStep = .review
             } else {
                 selectionError = "A waiting video could not be found in the queue."
             }
