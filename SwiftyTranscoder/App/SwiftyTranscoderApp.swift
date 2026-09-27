@@ -36,10 +36,10 @@ private enum SwiftyTranscoderAboutPanel {
         options[.applicationName] = "SwiftyTranscoder"
         options[.applicationVersion] = Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "0.1.0"
+        ) as? String ?? "1.0.0"
         options[.version] = Bundle.main.object(
             forInfoDictionaryKey: "CFBundleVersion"
-        ) as? String ?? "1"
+        ) as? String ?? "10"
         NSApplication.shared.orderFrontStandardAboutPanel(options: options)
     }
 }
