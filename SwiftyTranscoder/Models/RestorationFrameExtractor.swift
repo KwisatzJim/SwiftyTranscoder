@@ -51,7 +51,13 @@ struct RestorationFrameExtraction: Equatable, Sendable {
     }
 }
 
-actor RestorationFrameExtractor {
+protocol RestorationFrameExtracting: Sendable {
+    func extract(_ extraction: RestorationFrameExtraction) async throws -> [URL]
+    func cancel() async
+    func currentProgress() async -> Double
+}
+
+actor RestorationFrameExtractor: RestorationFrameExtracting {
     private let executableURL: URL
     private var process: Process?
     private var cancellationRequested = false
@@ -146,6 +152,8 @@ actor RestorationFrameExtractor {
         cancellationRequested = true
         process?.terminate()
     }
+
+    func currentProgress() -> Double { progress }
 
     private func prepare(_ extraction: RestorationFrameExtraction) throws {
         let fileManager = FileManager.default

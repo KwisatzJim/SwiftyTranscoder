@@ -45,7 +45,13 @@ struct RestorationFrameSequence: Equatable, Sendable {
     }
 }
 
-actor RestorationFrameSequenceProcessor {
+protocol RestorationFrameSequenceProcessing: Sendable {
+    func process(_ sequence: RestorationFrameSequence) async throws -> [URL]
+    func cancel() async
+    func currentProgress() async -> Double
+}
+
+actor RestorationFrameSequenceProcessor: RestorationFrameSequenceProcessing {
     private let frameProcessor: any RestorationFrameProcessing
     private var cancellationRequested = false
     private(set) var progress = 0.0
@@ -86,6 +92,8 @@ actor RestorationFrameSequenceProcessor {
         cancellationRequested = true
         await frameProcessor.cancel()
     }
+
+    func currentProgress() -> Double { progress }
 
     private func prepare(_ sequence: RestorationFrameSequence) throws {
         let fileManager = FileManager.default

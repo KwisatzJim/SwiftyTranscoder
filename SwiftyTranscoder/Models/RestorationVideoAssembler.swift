@@ -90,7 +90,13 @@ struct RestorationVideoAssembly: Equatable, Sendable {
     }
 }
 
-actor RestorationVideoAssembler {
+protocol RestorationVideoAssembling: Sendable {
+    func assemble(_ assembly: RestorationVideoAssembly) async throws -> URL
+    func cancel() async
+    func currentProgress() async -> Double
+}
+
+actor RestorationVideoAssembler: RestorationVideoAssembling {
     private let ffmpegURL: URL
     private let ffprobeURL: URL
     private var process: Process?
@@ -175,6 +181,8 @@ actor RestorationVideoAssembler {
         cancellationRequested = true
         process?.terminate()
     }
+
+    func currentProgress() -> Double { progress }
 
     private func prepare(_ assembly: RestorationVideoAssembly) throws {
         let fileManager = FileManager.default
