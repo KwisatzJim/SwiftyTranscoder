@@ -59,6 +59,7 @@ fi
 "$VENV_DIR/bin/python" -m pip install \
     coremltools==9.0 \
     numpy==2.2.6 \
+    pillow==12.3.0 \
     torch==2.7.0
 
 if [[ "$(grep -c 'ct.target.macOS15' "$ORIGINAL_CONVERTER")" != "1" ]]; then

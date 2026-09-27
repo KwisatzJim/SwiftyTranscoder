@@ -5,6 +5,7 @@ build/
 dist/
 *.dmg
 *.mkv
+*.m4v
 *.mp4
 *.partial.mp4
 *.xcuserstate
