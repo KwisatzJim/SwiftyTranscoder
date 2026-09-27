@@ -69,7 +69,7 @@ Create a verified local release from the repository root with:
 Scripts/build-release.sh
 ```
 
-The script refuses to replace an existing DMG for the current version. To deliberately rebuild and replace that artifact, use `Scripts/build-release.sh --force`.
+The script runs the regression suite, rebuilds the pinned toolchain, verifies the signed application, creates and verifies the DMG, mounts it read-only, and repeats the app checks from the packaged copy. It refuses to replace an existing DMG for the current version. To deliberately rebuild and replace that artifact, use `Scripts/build-release.sh --force`.
 
 ## Workflow
 
@@ -123,7 +123,7 @@ The conversion plan can remember gain and subtitle-policy defaults across source
 - Likely-forced analysis depends on trustworthy Matroska subtitle statistics. Missing, malformed, lone, or ambiguous statistical evidence produces no recommendation.
 - The current personal release is arm64 and ad-hoc signed; it is not a Developer ID signed or notarized public distribution.
 
-The self-contained distribution design is documented in `Documentation/Milestone-52.md`. Milestone 53 adds a checksum-pinned minimal FFmpeg build that passed isolated capability and representative media tests. Milestone 54 proves bundle-relative loading and catches that Homebrew's current supporting libraries require macOS 26 or 27, so they cannot be shipped in an app targeting macOS 14. Milestone 55 replaces that runtime closure with checksum-pinned, macOS 14 static builds of libass, FreeType, FriBidi, and HarfBuzz. Milestone 56 embeds the two verified helpers and six license-notice files in the signed app. Milestone 57 makes inspection and conversion prefer those app-contained helpers and retains Homebrew solely as a development fallback. Milestone 58 packages and independently validates the self-contained `0.9.0` DMG. The approximately 21 MB Release app passed signed, bundled inspection and conversion tests.
+The self-contained distribution design is documented in `Documentation/Milestone-52.md`. Milestone 53 adds a checksum-pinned minimal FFmpeg build that passed isolated capability and representative media tests. Milestone 54 proves bundle-relative loading and catches that Homebrew's current supporting libraries require macOS 26 or 27, so they cannot be shipped in an app targeting macOS 14. Milestone 55 replaces that runtime closure with checksum-pinned, macOS 14 static builds of libass, FreeType, FriBidi, and HarfBuzz. Milestone 56 embeds the two verified helpers and six license-notice files in the signed app. Milestone 57 makes inspection and conversion prefer those app-contained helpers and retains Homebrew solely as a development fallback. Milestone 58 packages and independently validates the self-contained `0.9.0` DMG. Milestone 59 makes the automated tests and mounted-DMG inspection mandatory release gates. The approximately 21 MB Release app passed signed, bundled inspection and conversion tests.
 
 ## Plex validation
 

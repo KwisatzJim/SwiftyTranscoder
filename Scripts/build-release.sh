@@ -34,8 +34,13 @@ work_dir="$(mktemp -d /tmp/SwiftyTranscoder-release.XXXXXX)"
 derived_data="$work_dir/DerivedData"
 staging_dir="$work_dir/DMG"
 temporary_dmg="$work_dir/SwiftyTranscoder.dmg"
+mounted=0
+mount_dir=""
 
 cleanup() {
+    if [[ $mounted -eq 1 && -n "$mount_dir" ]]; then
+        hdiutil detach "$mount_dir" >/dev/null 2>&1 || true
+    fi
     case "$work_dir" in
         /tmp/SwiftyTranscoder-release.*) rm -rf "$work_dir" ;;
     esac
@@ -43,6 +48,9 @@ cleanup() {
 trap cleanup EXIT
 
 cd "$project_root"
+
+echo "Running regression tests…"
+swift test
 
 echo "Preparing the self-contained media toolchain…"
 "$script_dir/build-toolchain.sh"
@@ -84,7 +92,7 @@ if [[ -e "$dmg_path" && $force -ne 1 ]]; then
 fi
 
 echo "Verifying SwiftyTranscoder ${version} (${build_number})…"
-codesign --verify --deep --strict --verbose=2 "$app_path"
+"$script_dir/verify-release-app.sh" "$app_path"
 
 mkdir -p "$staging_dir" "$dist_dir"
 ditto "$app_path" "$staging_dir/SwiftyTranscoder.app"
@@ -98,6 +106,20 @@ diskutil image create from \
     "$temporary_dmg"
 
 hdiutil verify "$temporary_dmg"
+
+mount_dir="$work_dir/MountedDMG"
+mkdir -p "$mount_dir"
+echo "Mounting the DMG for an independent packaged-app check…"
+hdiutil attach -readonly -nobrowse -mountpoint "$mount_dir" "$temporary_dmg" >/dev/null
+mounted=1
+if [[ ! -L "$mount_dir/Applications" ]]; then
+    echo "The mounted DMG is missing its Applications shortcut." >&2
+    exit 1
+fi
+"$script_dir/verify-release-app.sh" "$mount_dir/SwiftyTranscoder.app"
+hdiutil detach "$mount_dir" >/dev/null
+mounted=0
+
 if [[ -e "$dmg_path" ]]; then
     rm "$dmg_path"
 fi
