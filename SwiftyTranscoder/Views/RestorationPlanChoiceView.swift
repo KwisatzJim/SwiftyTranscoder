@@ -24,14 +24,14 @@ struct RestorationPlanChoiceView: View {
                             "\(plan.sourceWidth)×\(plan.sourceHeight) → \(plan.outputWidth)×\(plan.outputHeight) (\(plan.scaleDescription))"
                         )
                         planRow("Frame rate", "Preserve source")
-                        planRow("Temporary storage", temporaryStorageDescription)
+                        planRow("Bounded workspace", temporaryStorageDescription)
                     }
 
                     if let estimate = storageEstimate,
                        let available = temporaryVolumeAvailableBytes,
                        available < estimate.temporaryBytes {
                         Label(
-                            "The current temporary volume does not have enough free space for this plan.",
+                            "The current temporary volume does not have enough free space for the bounded workspace.",
                             systemImage: "externaldrive.fill.badge.exclamationmark"
                         )
                         .font(.caption)
@@ -39,7 +39,7 @@ struct RestorationPlanChoiceView: View {
                     }
 
                     Label(
-                        "Planning review only. Full-file restoration execution is not enabled in this milestone.",
+                        "Planning review only. Full-file execution remains disabled while chunk assembly and final validation are added.",
                         systemImage: "info.circle.fill"
                     )
                     .font(.caption)
@@ -59,11 +59,12 @@ struct RestorationPlanChoiceView: View {
             return "Could not calculate — restoration remains blocked"
         }
         let required = DestinationSpaceCheck.format(estimate.temporaryBytes)
-        let frames = estimate.frameCount.formatted()
+        let chunks = estimate.chunkCount.formatted()
+        let residentFrames = estimate.maximumResidentFrameCount.formatted()
         guard let available = temporaryVolumeAvailableBytes else {
-            return "About \(required) required for \(frames) frames; free space unavailable"
+            return "About \(required) required; up to \(residentFrames) frames across \(chunks) chunks; free space unavailable"
         }
-        return "\(DestinationSpaceCheck.format(available)) available; about \(required) required for \(frames) frames"
+        return "\(DestinationSpaceCheck.format(available)) available; about \(required) required, up to \(residentFrames) frames at once across \(chunks) chunks"
     }
 
     private var storageEstimate: RestorationStorageRequirement? {

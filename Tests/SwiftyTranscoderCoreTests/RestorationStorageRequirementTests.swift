@@ -2,7 +2,7 @@ import Testing
 @testable import SwiftyTranscoderCore
 
 struct RestorationStorageRequirementTests {
-    @Test func estimatesCompleteSourceAndRestoredFrameSequences() throws {
+    @Test func estimatesBoundedSourceAndRestoredFrameSequences() throws {
         let estimate = try #require(RestorationStorageRequirement.estimate(
             sourceBytes: 2_000_000_000,
             durationSeconds: 2_700,
@@ -11,7 +11,9 @@ struct RestorationStorageRequirementTests {
         ))
 
         #expect(estimate.frameCount == 64_736)
-        #expect(estimate.temporaryBytes == 289_456_400_384)
+        #expect(estimate.chunkCount == 540)
+        #expect(estimate.maximumResidentFrameCount == 120)
+        #expect(estimate.temporaryBytes == 5_600_897_024)
     }
 
     @Test func rejectsInvalidAndOverflowingInputs() {

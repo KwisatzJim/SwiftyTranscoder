@@ -4,6 +4,8 @@ struct RestorationStorageRequirement: Equatable, Sendable {
     static let reserveBytes: Int64 = 1_073_741_824
 
     let frameCount: Int64
+    let chunkCount: Int64
+    let maximumResidentFrameCount: Int64
     let temporaryBytes: Int64
 
     static func estimate(
@@ -20,18 +22,25 @@ struct RestorationStorageRequirement: Equatable, Sendable {
         guard frameCountValue.isFinite, frameCountValue > 0,
               frameCountValue <= Double(Int64.max) else { return nil }
         let frameCount = Int64(frameCountValue)
+        let maximumResidentFrameCount = min(
+            frameCount,
+            Int64(RestorationChunkPlan.defaultFrameLimit)
+        )
+        let chunkCount = (frameCount + maximumResidentFrameCount - 1) / maximumResidentFrameCount
 
         guard let sourcePixels = multiplied(Int64(plan.sourceWidth), Int64(plan.sourceHeight)),
               let outputPixels = multiplied(Int64(plan.outputWidth), Int64(plan.outputHeight)),
               let pixelsPerFrame = added(sourcePixels, outputPixels),
               let frameBytes = multiplied(pixelsPerFrame, 4),
-              let sequenceBytes = multiplied(frameBytes, frameCount),
+              let sequenceBytes = multiplied(frameBytes, maximumResidentFrameCount),
               let encodedWorkingBytes = multiplied(sourceBytes, 2),
               let withEncodedFiles = added(sequenceBytes, encodedWorkingBytes),
               let total = added(withEncodedFiles, reserveBytes) else { return nil }
 
         return RestorationStorageRequirement(
             frameCount: frameCount,
+            chunkCount: chunkCount,
+            maximumResidentFrameCount: maximumResidentFrameCount,
             temporaryBytes: total
         )
     }
