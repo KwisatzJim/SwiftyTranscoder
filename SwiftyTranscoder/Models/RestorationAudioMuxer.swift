@@ -1,6 +1,11 @@
 import Foundation
 
 struct RestorationAudioMux: Sendable {
+    enum Scope: Equatable, Sendable {
+        case preview
+        case fullDuration
+    }
+
     let sourceURL: URL
     let silentVideoURL: URL
     let outputURL: URL
@@ -10,6 +15,7 @@ struct RestorationAudioMux: Sendable {
     let audioSettings: CompatibilityAudioSettings
     let gainEnabled: Bool
     let aacStereoEnabled: Bool
+    let scope: Scope
 
     init(
         sourceURL: URL,
@@ -41,6 +47,39 @@ struct RestorationAudioMux: Sendable {
         self.audioSettings = audioSettings
         self.gainEnabled = gainEnabled
         self.aacStereoEnabled = aacStereoEnabled
+        scope = .preview
+    }
+
+    init(
+        fullDurationSourceURL sourceURL: URL,
+        silentVideoURL: URL,
+        workspaceURL: URL,
+        durationSeconds: Double,
+        sourceAudio: MediaStream,
+        gainEnabled: Bool,
+        aacStereoEnabled: Bool
+    ) throws {
+        guard silentVideoURL.lastPathComponent == "restored-silent.partial.mp4",
+              silentVideoURL.deletingLastPathComponent().standardizedFileURL.path
+                == workspaceURL.standardizedFileURL.path else {
+            throw RestorationAudioMuxerError.invalidSilentVideoLocation
+        }
+        guard durationSeconds > 0, durationSeconds.isFinite else {
+            throw RestorationAudioMuxerError.invalidTimeRange
+        }
+        guard let audioSettings = CompatibilityAudioSettings(source: sourceAudio) else {
+            throw RestorationAudioMuxerError.unsupportedAudioLayout
+        }
+        self.sourceURL = sourceURL
+        self.silentVideoURL = silentVideoURL
+        outputURL = workspaceURL.appendingPathComponent("restored-audio.partial.mp4")
+        startSeconds = 0
+        self.durationSeconds = durationSeconds
+        self.sourceAudio = sourceAudio
+        self.audioSettings = audioSettings
+        self.gainEnabled = gainEnabled
+        self.aacStereoEnabled = aacStereoEnabled
+        scope = .fullDuration
     }
 
     var audioLanguage: String {
@@ -244,13 +283,20 @@ actor RestorationAudioMuxer: RestorationAudioMuxing {
         }
         guard let durationText = inspection.format.duration,
               let duration = Double(durationText),
-              abs(duration - request.durationSeconds) <= max(0.1, request.durationSeconds * 0.05),
+              abs(duration - request.durationSeconds) <= durationTolerance(for: request),
               let sizeText = inspection.format.size, let size = Int64(sizeText), size > 0 else {
             throw RestorationAudioMuxerError.invalidDurationOrSize
         }
     }
 
     private func setProgress(_ value: Double) { progress = value }
+
+    private func durationTolerance(for request: RestorationAudioMux) -> Double {
+        switch request.scope {
+        case .preview: max(0.1, request.durationSeconds * 0.05)
+        case .fullDuration: max(0.1, request.durationSeconds * 0.001)
+        }
+    }
 }
 
 enum RestorationAudioMuxerError: LocalizedError, Equatable {
@@ -264,20 +310,20 @@ enum RestorationAudioMuxerError: LocalizedError, Equatable {
         switch self {
         case .executableNotFound: "The bundled FFmpeg or ffprobe helper is unavailable."
         case .alreadyRunning: "Restoration audio muxing is already running."
-        case .invalidSilentVideoLocation: "The silent restored video is not in the approved preview workspace."
-        case .invalidTimeRange: "The restoration audio preview range must be between zero and 30 seconds."
+        case .invalidSilentVideoLocation: "The silent restored video is not in the approved restoration workspace."
+        case .invalidTimeRange: "The restoration audio time range is invalid."
         case .unsupportedAudioLayout: "The selected audio layout is not supported by the compatibility output."
         case .inputMissing: "A restoration audio mux input is unavailable."
-        case .outputExists: "The restored-preview partial output already exists and will not be overwritten."
+        case .outputExists: "The restored-audio partial output already exists and will not be overwritten."
         case .couldNotLaunch(let reason): "Could not start a media helper: \(reason)"
         case .muxFailed(let exitCode, let reason): "Restoration audio muxing failed with exit code \(exitCode): \(reason)"
-        case .validationProbeFailed(let reason): "The restored preview could not be inspected: \(reason)"
-        case .invalidProbeResponse: "ffprobe returned unreadable restored-preview metadata."
-        case .invalidStreamLayout: "The restored preview stream layout is not the approved video-and-audio layout."
-        case .invalidVideoFormat: "The restored preview did not preserve HEVC with the hvc1 compatibility tag."
-        case .invalidPrimaryAudio: "The restored preview primary AC-3 track is invalid."
-        case .invalidSecondaryAudio: "The restored preview secondary AAC stereo track is invalid."
-        case .invalidDurationOrSize: "The restored preview duration or file size is invalid."
+        case .validationProbeFailed(let reason): "The restored audio output could not be inspected: \(reason)"
+        case .invalidProbeResponse: "ffprobe returned unreadable restored-audio metadata."
+        case .invalidStreamLayout: "The restored audio output does not have the approved video-and-audio layout."
+        case .invalidVideoFormat: "The restored audio output did not preserve HEVC with the hvc1 compatibility tag."
+        case .invalidPrimaryAudio: "The restored primary AC-3 track is invalid."
+        case .invalidSecondaryAudio: "The restored secondary AAC stereo track is invalid."
+        case .invalidDurationOrSize: "The restored audio output duration or file size is invalid."
         }
     }
 }
