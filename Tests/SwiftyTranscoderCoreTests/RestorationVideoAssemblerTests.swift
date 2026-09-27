@@ -19,6 +19,12 @@ struct RestorationVideoAssemblerTests {
         #expect(fixture.assembly.outputURL.lastPathComponent == "restored-video.partial.mp4")
     }
 
+    @Test func acceptsEquivalentContainerFrameRateButRejectsChangedCadence() {
+        #expect(RestorationVideoAssembler.frameRatesMatch("23976/1000", "24000/1001"))
+        #expect(RestorationVideoAssembler.frameRatesMatch("77756400/3243011", "24000/1001"))
+        #expect(!RestorationVideoAssembler.frameRatesMatch("24/1", "24000/1001"))
+    }
+
     @Test func rejectsIncompleteNumericSequence() throws {
         let fixture = try VideoAssemblerFixture(frameCount: 2)
         defer { fixture.remove() }

@@ -83,7 +83,7 @@ struct RestorationVideoAssembly: Equatable, Sendable {
         return (number, digits.count)
     }
 
-    private static func frameRateValue(_ value: String) -> Double? {
+    fileprivate static func frameRateValue(_ value: String) -> Double? {
         let parts = value.split(separator: "/", maxSplits: 1).compactMap { Double($0) }
         guard parts.count == 2, parts[1] > 0 else { return nil }
         return parts[0] / parts[1]
@@ -244,7 +244,8 @@ actor RestorationVideoAssembler: RestorationVideoAssembling {
               video.height == assembly.plan.outputHeight else {
             throw RestorationVideoAssemblerError.changedDimensions
         }
-        guard video.averageFrameRate == assembly.plan.frameRate else {
+        guard let actualFrameRate = video.averageFrameRate,
+              Self.frameRatesMatch(actualFrameRate, assembly.plan.frameRate) else {
             throw RestorationVideoAssemblerError.changedFrameRate
         }
         guard video.colorRange == assembly.plan.colorRange,
@@ -263,6 +264,15 @@ actor RestorationVideoAssembler: RestorationVideoAssembling {
     }
 
     private func setProgress(_ value: Double) { progress = value }
+
+    static func frameRatesMatch(_ actual: String, _ expected: String) -> Bool {
+        guard let actualValue = RestorationVideoAssembly.frameRateValue(actual),
+              let expectedValue = RestorationVideoAssembly.frameRateValue(expected) else {
+            return false
+        }
+        let permittedDifference = max(actualValue, expectedValue) * 0.0001
+        return abs(actualValue - expectedValue) <= permittedDifference
+    }
 }
 
 enum RestorationVideoAssemblerError: LocalizedError, Equatable {
