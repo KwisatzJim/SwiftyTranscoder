@@ -130,6 +130,47 @@ def labeled_panel(image: Image.Image, label: str) -> Image.Image:
     return panel
 
 
+def process_frame(
+    frame: Path,
+    output_directory: Path,
+    model: ct.models.MLModel,
+    metadata: dict,
+) -> dict:
+    source = Image.open(frame).convert("RGB")
+    expected_size = (metadata["width"], metadata["height"])
+    if source.size != expected_size:
+        raise RuntimeError(f"{frame.name} is {source.size}; expected {expected_size}")
+
+    nearest = source.resize((source.width * SCALE, source.height * SCALE), Image.Resampling.NEAREST)
+    lanczos = source.resize((source.width * SCALE, source.height * SCALE), Image.Resampling.LANCZOS)
+    restored, tile_count, duration = restore(source, model)
+
+    lanczos_path = output_directory / f"{frame.stem}-lanczos.png"
+    restored_path = output_directory / f"{frame.stem}-real-esrgan.png"
+    comparison_path = output_directory / f"{frame.stem}-comparison.png"
+    lanczos.save(lanczos_path)
+    restored.save(restored_path)
+    panels = [
+        labeled_panel(nearest, "Source pixels (nearest-neighbor 2x display)"),
+        labeled_panel(lanczos, "Conventional Lanczos 2x"),
+        labeled_panel(restored, "Real-ESRGAN x2plus (provisional AI candidate)"),
+    ]
+    comparison = Image.new("RGB", (sum(panel.width for panel in panels), panels[0].height), "black")
+    offset = 0
+    for panel in panels:
+        comparison.paste(panel, (offset, 0))
+        offset += panel.width
+    comparison.save(comparison_path)
+    return {
+        "source": frame,
+        "lanczos": lanczos_path,
+        "restored": restored_path,
+        "comparison": comparison_path,
+        "tile_count": tile_count,
+        "duration": duration,
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=Path, required=True)
@@ -143,29 +184,8 @@ def main() -> None:
     args.output.mkdir(parents=True, exist_ok=True)
 
     for frame in args.frames:
-        source = Image.open(frame).convert("RGB")
-        expected_size = (metadata["width"], metadata["height"])
-        if source.size != expected_size:
-            raise RuntimeError(f"{frame.name} is {source.size}; expected {expected_size}")
-
-        nearest = source.resize((source.width * SCALE, source.height * SCALE), Image.Resampling.NEAREST)
-        lanczos = source.resize((source.width * SCALE, source.height * SCALE), Image.Resampling.LANCZOS)
-        restored, tile_count, duration = restore(source, model)
-
-        lanczos.save(args.output / f"{frame.stem}-lanczos.png")
-        restored.save(args.output / f"{frame.stem}-real-esrgan.png")
-        panels = [
-            labeled_panel(nearest, "Source pixels (nearest-neighbor 2x display)"),
-            labeled_panel(lanczos, "Conventional Lanczos 2x"),
-            labeled_panel(restored, "Real-ESRGAN x2plus (provisional AI candidate)"),
-        ]
-        comparison = Image.new("RGB", (sum(panel.width for panel in panels), panels[0].height), "black")
-        offset = 0
-        for panel in panels:
-            comparison.paste(panel, (offset, 0))
-            offset += panel.width
-        comparison.save(args.output / f"{frame.stem}-comparison.png")
-        print(f"{frame.name}: {tile_count} tiles, {duration:.3f} seconds")
+        result = process_frame(frame, args.output, model, metadata)
+        print(f"{frame.name}: {result['tile_count']} tiles, {result['duration']:.3f} seconds")
 
 
 if __name__ == "__main__":
