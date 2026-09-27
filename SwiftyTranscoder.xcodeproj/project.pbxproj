@@ -132,6 +132,10 @@
 				"$(SRCROOT)/.build/toolchain/dependencies/share/licenses/libass/COPYING",
 				"$(SRCROOT)/.build/toolchain/stage/share/licenses/ffmpeg/COPYING.LGPLv2.1",
 				"$(SRCROOT)/.build/toolchain/stage/share/licenses/ffmpeg/LICENSE.md",
+				"$(SRCROOT)/.build/restoration-evaluation/converter/weights/RealESRGAN_x2plus_522_fp16.mlpackage/Manifest.json",
+				"$(SRCROOT)/.build/restoration-evaluation/converter/weights/RealESRGAN_x2plus_522_fp16.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+				"$(SRCROOT)/.build/restoration-evaluation/converter/weights/RealESRGAN_x2plus_522_fp16.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+				"$(SRCROOT)/.build/restoration-evaluation/licenses/Real-ESRGAN-LICENSE.txt",
 			);
 			name = "Embed Toolchain";
 			outputFileListPaths = (
@@ -145,6 +149,10 @@
 				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/ThirdPartyNotices/libass-COPYING.txt",
 				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/ThirdPartyNotices/FFmpeg-COPYING.LGPLv2.1.txt",
 				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/ThirdPartyNotices/FFmpeg-LICENSE.md",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/Models/RealESRGAN_x2plus_522_fp16.mlpackage/Manifest.json",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/Models/RealESRGAN_x2plus_522_fp16.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/Models/RealESRGAN_x2plus_522_fp16.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/ThirdPartyNotices/Real-ESRGAN-LICENSE.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;

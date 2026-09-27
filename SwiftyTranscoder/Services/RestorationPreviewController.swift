@@ -138,7 +138,11 @@ final class RestorationPreviewController: ObservableObject {
 private enum RestorationPreviewModelLocator {
     static func modelURL(fileManager: FileManager = .default) throws -> URL {
         let name = "RealESRGAN_x2plus_522_fp16"
-        if let bundled = Bundle.main.url(forResource: name, withExtension: "mlpackage") {
+        if let bundled = Bundle.main.url(
+            forResource: name,
+            withExtension: "mlpackage",
+            subdirectory: "Models"
+        ) {
             return bundled
         }
         let sourceRoot = URL(fileURLWithPath: #filePath)
@@ -160,6 +164,6 @@ private enum RestorationPreviewControllerError: LocalizedError {
     case modelUnavailable
 
     var errorDescription: String? {
-        "The research restoration model is unavailable. Run Scripts/prepare-restoration-model.sh before creating a preview."
+        "The restoration model is unavailable. Run Scripts/prepare-restoration-model.sh, then rebuild SwiftyTranscoder."
     }
 }

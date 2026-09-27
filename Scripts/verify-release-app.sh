@@ -13,6 +13,7 @@ helpers_path="$app_path/Contents/Helpers"
 notices_path="$app_path/Contents/Resources/ThirdPartyNotices"
 ffmpeg_path="$helpers_path/ffmpeg"
 ffprobe_path="$helpers_path/ffprobe"
+model_path="$app_path/Contents/Resources/Models/RealESRGAN_x2plus_522_fp16.mlpackage"
 
 if [[ ! -d "$app_path" || ! -x "$executable_path" ]]; then
     echo "SwiftyTranscoder application is incomplete: $app_path" >&2
@@ -32,10 +33,31 @@ if [[ ! -d "$notices_path" ]]; then
 fi
 
 notice_count="$(find "$notices_path" -type f | wc -l | tr -d ' ')"
-if [[ "$notice_count" -ne 6 ]]; then
-    echo "Expected 6 third-party notices, found $notice_count." >&2
+if [[ "$notice_count" -ne 7 ]]; then
+    echo "Expected 7 third-party notices, found $notice_count." >&2
     exit 1
 fi
+
+if [[ ! -d "$model_path" ]]; then
+    echo "Bundled restoration model is missing: $model_path" >&2
+    exit 1
+fi
+
+verify_checksum() {
+    local expected="$1"
+    local file="$2"
+    local actual
+    actual="$(shasum -a 256 "$file" | awk '{print $1}')"
+    if [[ "$actual" != "$expected" ]]; then
+        echo "Bundled restoration model checksum mismatch: $file" >&2
+        exit 1
+    fi
+}
+
+verify_checksum "6f4af8152eba8589bee31c7fe341a5b35534f06330056606a6df099589395790" "$model_path/Manifest.json"
+verify_checksum "b79575977211ba89fb7856076e652fdd34f822b5228858e15b8d61169720e1ac" "$model_path/Data/com.apple.CoreML/model.mlmodel"
+verify_checksum "a8904f0bb627d5dbce2468a96c648764a63ece561cfcf118da6321831bb3a926" "$model_path/Data/com.apple.CoreML/weights/weight.bin"
+verify_checksum "4a699ec4863d96a91fc265948a0c90033f7e8735d515524dcf3444736406e0c2" "$notices_path/Real-ESRGAN-LICENSE.txt"
 
 architectures="$(lipo -archs "$executable_path")"
 if [[ "$architectures" != "arm64" ]]; then
@@ -65,4 +87,4 @@ done
 
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app_path/Contents/Info.plist")"
 build_number="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app_path/Contents/Info.plist")"
-echo "Verified SwiftyTranscoder ${version} (${build_number}): arm64 app, signed bundled helpers, notices, and required media capabilities."
+echo "Verified SwiftyTranscoder ${version} (${build_number}): arm64 app, signed bundled helpers, restoration model, notices, and required media capabilities."

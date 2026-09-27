@@ -34,11 +34,15 @@ The first hands-on attempt exposed a packaging gap: backend tests had used a dev
 
 The narrow toolchain now explicitly includes only the additional restoration capabilities it needs: PNG encode/decode and `image2` mux/demux. Both the toolchain build and release-app verification scripts require those capabilities, preventing a future package from silently omitting them. A fresh application build's own bundled FFmpeg successfully extracted four numbered, nonempty PNG frames from the representative source using the exact application command.
 
-## Hands-on gate
+## Hands-on result
 
 Use `Alphas - s01e11 - Original Sin.m4v`, continue to the Plan step, leave the default 540-second start and five-second length, and select **Create Restoration Preview**.
 
-Confirm:
+The representative five-second preview completed after correcting two packaging/validation issues found by the hands-on run: the bundled FFmpeg initially lacked PNG/image-sequence support, and MP4 represented the approved cadence with a numerically equivalent but textually different fraction. The corrected build accepts only a tightly bounded container rounding difference while still rejecting a genuine cadence change.
+
+The completed preview played successfully and its restored picture was confirmed to look good. This passes the required picture, audio, synchronization, progress, and playback gate for advancing beyond preview-only research.
+
+The review covered:
 
 1. progress advances and the app remains responsive;
 2. **Cancel Preview** works if tested, after which a new preview can be started;
@@ -47,4 +51,4 @@ Confirm:
 5. audio is present at the expected protected-gain level; and
 6. lip movement and sound remain synchronized.
 
-Do not use the temporary partial as a production output. Full-file restoration remains unavailable until this gate passes.
+The reviewed temporary partial remains a preview rather than a production output. Full-file restoration stays unavailable until its separate plan, storage, cancellation, and final-output boundary is implemented.

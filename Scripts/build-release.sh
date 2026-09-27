@@ -56,6 +56,9 @@ echo "Preparing the self-contained media toolchain…"
 "$script_dir/build-toolchain.sh"
 "$script_dir/stage-toolchain-bundle.sh"
 
+echo "Preparing the checksum-pinned restoration model…"
+"$script_dir/prepare-restoration-model.sh"
+
 echo "Building SwiftyTranscoder Release configuration…"
 xcodebuild \
     -quiet \
