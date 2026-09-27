@@ -28,6 +28,12 @@ Bundling, licensing notices, release size, and update policy remain a separate d
 - Preview and normal conversion are mutually exclusive.
 - Cancellation remains available during every native preview stage.
 
+### Bundled-helper correction
+
+The first hands-on attempt exposed a packaging gap: backend tests had used a development FFmpeg with PNG support, while the deliberately narrow bundled helper did not yet include PNG or the `image2` sequence format. FFmpeg therefore could not infer an output format for `frame-%08d.png` and stopped with exit code 234.
+
+The narrow toolchain now explicitly includes only the additional restoration capabilities it needs: PNG encode/decode and `image2` mux/demux. Both the toolchain build and release-app verification scripts require those capabilities, preventing a future package from silently omitting them. A fresh application build's own bundled FFmpeg successfully extracted four numbered, nonempty PNG frames from the representative source using the exact application command.
+
 ## Hands-on gate
 
 Use `Alphas - s01e11 - Original Sin.m4v`, continue to the Plan step, leave the default 540-second start and five-second length, and select **Create Restoration Preview**.

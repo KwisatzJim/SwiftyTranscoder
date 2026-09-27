@@ -59,6 +59,9 @@ done
 "$ffprobe_path" -hide_banner -version | grep -q '^ffprobe version 9\.0\.2'
 "$ffmpeg_path" -hide_banner -filters | grep -q ' subtitles '
 "$ffmpeg_path" -hide_banner -encoders | grep -q 'hevc_videotoolbox'
+"$ffmpeg_path" -hide_banner -encoders | grep -q ' png '
+"$ffmpeg_path" -hide_banner -decoders | grep -q ' png '
+"$ffmpeg_path" -hide_banner -formats | grep -q ' image2 '
 
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app_path/Contents/Info.plist")"
 build_number="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app_path/Contents/Info.plist")"

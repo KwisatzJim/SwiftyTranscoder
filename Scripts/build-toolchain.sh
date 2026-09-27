@@ -79,10 +79,10 @@ echo "Configuring the narrow FFmpeg toolchain…"
     --enable-zlib \
     --enable-libass \
     --enable-protocol=file,pipe \
-    --enable-demuxer=matroska,mov \
-    --enable-muxer=mp4 \
-    --enable-decoder=h264,hevc,mjpeg,aac,ac3,eac3,dca,truehd,flac,mp3,opus,vorbis,alac,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,subrip,pgssub \
-    --enable-encoder=hevc_videotoolbox,ac3,aac \
+    --enable-demuxer=matroska,mov,image2 \
+    --enable-muxer=mp4,image2 \
+    --enable-decoder=h264,hevc,mjpeg,png,aac,ac3,eac3,dca,truehd,flac,mp3,opus,vorbis,alac,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,subrip,pgssub \
+    --enable-encoder=hevc_videotoolbox,png,ac3,aac \
     --enable-parser=aac,aac_latm,ac3,h264,hevc,mpegaudio,opus,vorbis \
     --enable-bsf=aac_adtstoasc,extract_extradata,h264_mp4toannexb,hevc_mp4toannexb \
     --enable-filter=abuffer,abuffersink,aformat,alimiter,anull,aresample,buffer,buffersink,format,scale,setparams,subtitles,volume
@@ -104,6 +104,9 @@ test -x "$ffprobe_bin"
 "$ffmpeg_bin" -hide_banner -encoders | grep -q 'hevc_videotoolbox'
 "$ffmpeg_bin" -hide_banner -encoders | grep -q ' ac3 '
 "$ffmpeg_bin" -hide_banner -encoders | grep -q ' aac '
+"$ffmpeg_bin" -hide_banner -encoders | grep -q ' png '
+"$ffmpeg_bin" -hide_banner -decoders | grep -q ' png '
+"$ffmpeg_bin" -hide_banner -formats | grep -q ' image2 '
 "$ffmpeg_bin" -hide_banner -decoders | grep -q ' pgssub '
 "$ffmpeg_bin" -hide_banner -filters | grep -q ' subtitles '
 "$ffmpeg_bin" -hide_banner -filters | grep -q ' alimiter '
