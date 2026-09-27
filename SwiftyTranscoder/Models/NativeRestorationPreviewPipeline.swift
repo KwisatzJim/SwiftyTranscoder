@@ -1,18 +1,24 @@
 import Foundation
 
-struct NativeRestorationPreviewRequest: Equatable, Sendable {
+struct NativeRestorationPreviewRequest: Sendable {
     let sourceURL: URL
     let workspaceURL: URL
     let startSeconds: Double
     let frameCount: Int
     let plan: RestorationPlan
+    let sourceAudio: MediaStream
+    let gainEnabled: Bool
+    let aacStereoEnabled: Bool
 
     init(
         sourceURL: URL,
         workspaceURL: URL,
         startSeconds: Double,
         frameCount: Int,
-        plan: RestorationPlan
+        plan: RestorationPlan,
+        sourceAudio: MediaStream,
+        gainEnabled: Bool,
+        aacStereoEnabled: Bool
     ) throws {
         guard workspaceURL.lastPathComponent.hasPrefix("SwiftyTranscoder-Restoration-") else {
             throw NativeRestorationPreviewError.invalidWorkspaceName
@@ -28,6 +34,15 @@ struct NativeRestorationPreviewRequest: Equatable, Sendable {
         self.startSeconds = startSeconds
         self.frameCount = frameCount
         self.plan = plan
+        self.sourceAudio = sourceAudio
+        self.gainEnabled = gainEnabled
+        self.aacStereoEnabled = aacStereoEnabled
+    }
+
+    var durationSeconds: Double {
+        let parts = plan.frameRate.split(separator: "/", maxSplits: 1).compactMap { Double($0) }
+        guard parts.count == 2, parts[0] > 0 else { return 0 }
+        return Double(frameCount) * parts[1] / parts[0]
     }
 }
 
@@ -35,13 +50,14 @@ enum NativeRestorationPreviewStage: Equatable, Sendable {
     case extractingFrames
     case restoringFrames
     case assemblingSilentVideo
+    case muxingAudio
 }
 
 enum NativeRestorationPreviewState: Equatable, Sendable {
     case idle
     case running(NativeRestorationPreviewStage)
     case cancelling(NativeRestorationPreviewStage)
-    case completed(silentPartialOutput: URL)
+    case completed(previewPartialOutput: URL)
     case cancelled
     case failed(String)
 }
@@ -50,6 +66,7 @@ actor NativeRestorationPreviewPipeline {
     private let extractor: any RestorationFrameExtracting
     private let sequenceProcessor: any RestorationFrameSequenceProcessing
     private let assembler: any RestorationVideoAssembling
+    private let audioMuxer: any RestorationAudioMuxing
     private var cancellationRequested = false
     private(set) var progress = 0.0
     private(set) var state: NativeRestorationPreviewState = .idle
@@ -57,11 +74,13 @@ actor NativeRestorationPreviewPipeline {
     init(
         extractor: any RestorationFrameExtracting,
         sequenceProcessor: any RestorationFrameSequenceProcessing,
-        assembler: any RestorationVideoAssembling
+        assembler: any RestorationVideoAssembling,
+        audioMuxer: any RestorationAudioMuxing
     ) {
         self.extractor = extractor
         self.sequenceProcessor = sequenceProcessor
         self.assembler = assembler
+        self.audioMuxer = audioMuxer
     }
 
     func run(_ request: NativeRestorationPreviewRequest) async -> NativeRestorationPreviewState {
@@ -102,7 +121,7 @@ actor NativeRestorationPreviewPipeline {
                 expectedWidth: request.plan.sourceWidth,
                 expectedHeight: request.plan.sourceHeight
             )
-            let restorationMonitor = monitorProgress(base: 0.10, weight: 0.85) {
+            let restorationMonitor = monitorProgress(base: 0.10, weight: 0.83) {
                 await self.sequenceProcessor.currentProgress()
             }
             let restoredFrames: [URL]
@@ -114,7 +133,7 @@ actor NativeRestorationPreviewPipeline {
             }
             restorationMonitor.cancel()
             try checkCancellation()
-            progress = 0.95
+            progress = 0.93
 
             state = .running(.assemblingSilentVideo)
             let assembly = try RestorationVideoAssembly(
@@ -122,20 +141,45 @@ actor NativeRestorationPreviewPipeline {
                 workspaceURL: request.workspaceURL,
                 plan: request.plan
             )
-            let assemblyMonitor = monitorProgress(base: 0.95, weight: 0.05) {
+            let assemblyMonitor = monitorProgress(base: 0.93, weight: 0.05) {
                 await self.assembler.currentProgress()
             }
-            let output: URL
+            let silentOutput: URL
             do {
-                output = try await assembler.assemble(assembly)
+                silentOutput = try await assembler.assemble(assembly)
             } catch {
                 assemblyMonitor.cancel()
                 throw error
             }
             assemblyMonitor.cancel()
             try checkCancellation()
+            progress = 0.98
+
+            state = .running(.muxingAudio)
+            let muxRequest = try RestorationAudioMux(
+                sourceURL: request.sourceURL,
+                silentVideoURL: silentOutput,
+                workspaceURL: request.workspaceURL,
+                startSeconds: request.startSeconds,
+                durationSeconds: request.durationSeconds,
+                sourceAudio: request.sourceAudio,
+                gainEnabled: request.gainEnabled,
+                aacStereoEnabled: request.aacStereoEnabled
+            )
+            let muxMonitor = monitorProgress(base: 0.98, weight: 0.02) {
+                await self.audioMuxer.currentProgress()
+            }
+            let previewOutput: URL
+            do {
+                previewOutput = try await audioMuxer.mux(muxRequest)
+            } catch {
+                muxMonitor.cancel()
+                throw error
+            }
+            muxMonitor.cancel()
+            try checkCancellation()
             progress = 1
-            state = .completed(silentPartialOutput: output)
+            state = .completed(previewPartialOutput: previewOutput)
         } catch {
             try? removeOwnedWorkspace(request.workspaceURL)
             if cancellationRequested || error is CancellationError {
@@ -155,6 +199,7 @@ actor NativeRestorationPreviewPipeline {
         case .extractingFrames: await extractor.cancel()
         case .restoringFrames: await sequenceProcessor.cancel()
         case .assemblingSilentVideo: await assembler.cancel()
+        case .muxingAudio: await audioMuxer.cancel()
         }
     }
 

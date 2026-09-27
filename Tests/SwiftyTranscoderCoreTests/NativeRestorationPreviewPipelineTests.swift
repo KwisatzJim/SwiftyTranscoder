@@ -3,24 +3,28 @@ import Testing
 @testable import SwiftyTranscoderCore
 
 struct NativeRestorationPreviewPipelineTests {
-    @Test func runsThreeNativeStagesInOrderWithoutFinalPromotion() async throws {
+    @Test func runsFourNativeStagesInOrderWithoutFinalPromotion() async throws {
         let fixture = try PreviewPipelineFixture()
         defer { fixture.remove() }
         let recorder = PipelineRecorder()
         let extractor = MockPreviewExtractor(recorder: recorder)
         let restorer = MockPreviewRestorer(recorder: recorder)
         let assembler = MockPreviewAssembler(recorder: recorder)
+        let audioMuxer = MockPreviewAudioMuxer(recorder: recorder)
         let pipeline = NativeRestorationPreviewPipeline(
             extractor: extractor,
             sequenceProcessor: restorer,
-            assembler: assembler
+            assembler: assembler,
+            audioMuxer: audioMuxer
         )
 
         let result = await pipeline.run(fixture.request)
 
-        let expectedOutput = fixture.workspaceURL.appendingPathComponent("restored-video.partial.mp4")
-        #expect(result == .completed(silentPartialOutput: expectedOutput))
-        #expect(await recorder.stages == [.extractingFrames, .restoringFrames, .assemblingSilentVideo])
+        let expectedOutput = fixture.workspaceURL.appendingPathComponent("restored-preview.partial.mp4")
+        #expect(result == .completed(previewPartialOutput: expectedOutput))
+        #expect(await recorder.stages == [
+            .extractingFrames, .restoringFrames, .assemblingSilentVideo, .muxingAudio,
+        ])
         #expect(await pipeline.progress == 1)
         #expect(FileManager.default.fileExists(atPath: expectedOutput.path))
         #expect(!FileManager.default.fileExists(atPath: fixture.finalOutputURL.path))
@@ -33,7 +37,8 @@ struct NativeRestorationPreviewPipelineTests {
         let pipeline = NativeRestorationPreviewPipeline(
             extractor: extractor,
             sequenceProcessor: MockPreviewRestorer(recorder: PipelineRecorder()),
-            assembler: MockPreviewAssembler(recorder: PipelineRecorder())
+            assembler: MockPreviewAssembler(recorder: PipelineRecorder()),
+            audioMuxer: MockPreviewAudioMuxer(recorder: PipelineRecorder())
         )
         let task = Task { await pipeline.run(fixture.request) }
 
@@ -55,7 +60,8 @@ struct NativeRestorationPreviewPipelineTests {
         let pipeline = NativeRestorationPreviewPipeline(
             extractor: MockPreviewExtractor(recorder: recorder),
             sequenceProcessor: MockPreviewRestorer(recorder: recorder),
-            assembler: MockPreviewAssembler(recorder: recorder)
+            assembler: MockPreviewAssembler(recorder: recorder),
+            audioMuxer: MockPreviewAudioMuxer(recorder: recorder)
         )
 
         let result = await pipeline.run(fixture.request)
@@ -87,20 +93,24 @@ struct NativeRestorationPreviewPipelineTests {
             workspaceURL: workspaceURL,
             startSeconds: 540,
             frameCount: 4,
-            plan: PreviewPipelineFixture.plan
+            plan: PreviewPipelineFixture.plan,
+            sourceAudio: PreviewPipelineFixture.sourceAudio,
+            gainEnabled: true,
+            aacStereoEnabled: true
         )
         let tiles = try CoreMLRestorationTileProcessor(modelURL: modelURL)
         let frames = RestorationFrameProcessor(tileProcessor: tiles)
         let pipeline = NativeRestorationPreviewPipeline(
             extractor: RestorationFrameExtractor(executableURL: ffmpeg),
             sequenceProcessor: RestorationFrameSequenceProcessor(frameProcessor: frames),
-            assembler: RestorationVideoAssembler(ffmpegURL: ffmpeg, ffprobeURL: ffprobe)
+            assembler: RestorationVideoAssembler(ffmpegURL: ffmpeg, ffprobeURL: ffprobe),
+            audioMuxer: RestorationAudioMuxer(ffmpegURL: ffmpeg, ffprobeURL: ffprobe)
         )
 
         let result = await pipeline.run(request)
 
-        let output = workspaceURL.appendingPathComponent("restored-video.partial.mp4")
-        #expect(result == .completed(silentPartialOutput: output))
+        let output = workspaceURL.appendingPathComponent("restored-preview.partial.mp4")
+        #expect(result == .completed(previewPartialOutput: output))
         #expect(await pipeline.progress == 1)
         #expect(FileManager.default.fileExists(atPath: output.path))
     }
@@ -126,7 +136,10 @@ private struct PreviewPipelineFixture {
             workspaceURL: workspaceURL,
             startSeconds: 9,
             frameCount: 3,
-            plan: Self.plan
+            plan: Self.plan,
+            sourceAudio: Self.sourceAudio,
+            gainEnabled: true,
+            aacStereoEnabled: true
         )
     }
 
@@ -141,6 +154,11 @@ private struct PreviewPipelineFixture {
         colorSpace: "smpte170m",
         colorTransfer: "bt709",
         colorPrimaries: "smpte170m"
+    )
+
+    static let sourceAudio = mediaStream(
+        index: 1, codecName: "aac", codecType: "audio", channels: 2,
+        channelLayout: "stereo", sampleRate: "48000", tags: ["language": "und"]
     )
 
     func remove() { try? FileManager.default.removeItem(at: rootURL) }
@@ -200,6 +218,19 @@ private actor MockPreviewAssembler: RestorationVideoAssembling {
         await recorder.append(.assemblingSilentVideo)
         try Data("silent partial".utf8).write(to: assembly.outputURL)
         return assembly.outputURL
+    }
+    func cancel() async {}
+    func currentProgress() async -> Double { 1 }
+}
+
+private actor MockPreviewAudioMuxer: RestorationAudioMuxing {
+    let recorder: PipelineRecorder
+    init(recorder: PipelineRecorder) { self.recorder = recorder }
+
+    func mux(_ request: RestorationAudioMux) async throws -> URL {
+        await recorder.append(.muxingAudio)
+        try Data("preview partial".utf8).write(to: request.outputURL)
+        return request.outputURL
     }
     func cancel() async {}
     func currentProgress() async -> Double { 1 }
