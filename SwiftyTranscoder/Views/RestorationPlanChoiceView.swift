@@ -39,7 +39,7 @@ struct RestorationPlanChoiceView: View {
                     }
 
                     Label(
-                        "Planning review only. Full-file execution remains disabled while chunk assembly and final validation are added.",
+                        "Planning review only. Full-file execution remains disabled while final audio, subtitle, and destination validation are added.",
                         systemImage: "info.circle.fill"
                     )
                     .font(.caption)

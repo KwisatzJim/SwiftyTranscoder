@@ -83,7 +83,7 @@ struct RestorationVideoAssembly: Equatable, Sendable {
         return (number, digits.count)
     }
 
-    fileprivate static func frameRateValue(_ value: String) -> Double? {
+    static func frameRateValue(_ value: String) -> Double? {
         let parts = value.split(separator: "/", maxSplits: 1).compactMap { Double($0) }
         guard parts.count == 2, parts[1] > 0 else { return nil }
         return parts[0] / parts[1]
