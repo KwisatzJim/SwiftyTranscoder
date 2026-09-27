@@ -53,7 +53,17 @@ struct RestorationFrameGeometry: Equatable, Sendable {
     }
 }
 
-actor RestorationFrameProcessor {
+protocol RestorationFrameProcessing: Sendable {
+    func process(
+        sourceURL: URL,
+        outputURL: URL,
+        expectedWidth: Int,
+        expectedHeight: Int
+    ) async throws -> URL
+    func cancel() async
+}
+
+actor RestorationFrameProcessor: RestorationFrameProcessing {
     private let tileProcessor: any RestorationTileProcessing
     private var cancellationRequested = false
     private(set) var progress = 0.0
