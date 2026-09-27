@@ -65,7 +65,12 @@ final class RestorationTileTensor: @unchecked Sendable {
     }
 }
 
-actor CoreMLRestorationTileProcessor {
+protocol RestorationTileProcessing: Sendable {
+    func process(_ input: RestorationTileTensor) async throws -> RestorationTileTensor
+    func cancel() async
+}
+
+actor CoreMLRestorationTileProcessor: RestorationTileProcessing {
     let contract: RestorationModelContract
 
     private let model: MLModel
