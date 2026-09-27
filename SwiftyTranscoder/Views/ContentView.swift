@@ -40,6 +40,7 @@ struct ContentView: View {
     @State private var subtitleSelection = SubtitleSelection.needsChoice
     @State private var outputURL: URL?
     @State private var isRestorationPreviewActive = false
+    @State private var restorationEnabled = false
     @AppStorage("savedOutputFolderPath") private var savedOutputFolderPath = ""
     @AppStorage("defaultGainEnabled") private var defaultGainEnabled = true
     @AppStorage("defaultSubtitleMode") private var defaultSubtitleMode = "recommended"
@@ -529,7 +530,15 @@ struct ContentView: View {
         sourceURL: URL,
         showsApprovalAction: Bool
     ) -> some View {
-        let conversionBlockingReason = conversionBlockingReason(inspection: inspection)
+        let restorationEligibility = RestorationPlanner().plan(for: inspection)
+        let restorationPlan: RestorationPlan? = if case .eligible(let plan) = restorationEligibility {
+            plan
+        } else {
+            nil
+        }
+        let conversionBlockingReason = restorationEnabled
+            ? "Full-file restoration execution is not enabled yet. Turn restoration off to use the ordinary conversion path."
+            : conversionBlockingReason(inspection: inspection)
 
         return VStack(spacing: 14) {
             ConversionPlanView(
@@ -539,6 +548,7 @@ struct ContentView: View {
                     aacStereoEnabled: aacStereoEnabled,
                     colorSelection: colorSelection,
                     subtitleSelection: subtitleSelection,
+                    restorationPlan: restorationEnabled ? restorationPlan : nil,
                     outputURL: outputURL,
                     completedOutputURL: conversionController.completedOutputURL,
                     managedPartialOutputURL: conversionController.managedPartialOutputURL
@@ -556,7 +566,14 @@ struct ContentView: View {
             )
             .disabled(isBatchRunning || isBatchReady || isRestorationPreviewActive)
 
-            if case .eligible(let restorationPlan) = RestorationPlanner().plan(for: inspection) {
+            if let restorationPlan {
+                RestorationPlanChoiceView(
+                    inspection: inspection,
+                    plan: restorationPlan,
+                    isEnabled: $restorationEnabled
+                )
+                .disabled(isBatchRunning || isBatchReady || isRestorationPreviewActive)
+
                 RestorationPreviewView(
                     sourceURL: sourceURL,
                     inspection: inspection,
@@ -689,6 +706,7 @@ struct ContentView: View {
         colorSelection = .needsConfirmation
         subtitleSelection = .needsChoice
         outputURL = nil
+        restorationEnabled = false
         if let savedFolder = validSavedOutputFolder {
             outputURL = OutputNaming.proposedURL(
                 sourceURL: source,
@@ -866,6 +884,7 @@ struct ContentView: View {
         aacStereoEnabled = approved.aacStereoEnabled
         colorSelection = approved.colorSelection
         subtitleSelection = approved.subtitleSelection
+        restorationEnabled = false
     }
 
     private func performPrimaryAction(sourceURL: URL, inspection: MediaInspection) {

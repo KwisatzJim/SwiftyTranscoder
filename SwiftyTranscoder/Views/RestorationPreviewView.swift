@@ -15,7 +15,7 @@ struct RestorationPreviewView: View {
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Create a short, temporary restored clip before enabling full-file restoration. The source and normal conversion plan are not changed.")
+                Text("Create a short, temporary restored clip before running full-file restoration. The source and normal conversion plan are not changed.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
 
@@ -88,7 +88,7 @@ struct RestorationPreviewView: View {
                     Button("Try Again", systemImage: "arrow.clockwise") { controller.reset() }
                 }
 
-                Text("Research preview only · temporary .partial.mp4 · no final output is created")
+                Text("Review preview only · temporary .partial.mp4 · no final output is created")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

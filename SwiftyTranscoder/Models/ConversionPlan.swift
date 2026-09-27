@@ -22,16 +22,23 @@ struct ConversionPlan: Sendable {
         aacStereoEnabled: Bool = false,
         colorSelection: ColorSelection,
         subtitleSelection: SubtitleSelection,
+        restorationPlan: RestorationPlan? = nil,
         outputURL: URL? = nil,
         completedOutputURL: URL? = nil,
         managedPartialOutputURL: URL? = nil
     ) {
         let summary = MediaSummary(inspection: inspection)
         let isMP4Source = inspection.format.formatName?.lowercased().contains("mp4") == true
-        videoFormat = isMP4Source
+        videoFormat = restorationPlan.map {
+            "\($0.method.rawValue), then HEVC using Apple hardware"
+        } ?? (isMP4Source
             ? "Copy source video unchanged (no re-encoding)"
-            : "HEVC using Apple hardware"
-        videoDimensions = summary.video?.resolution ?? "Unknown—conversion blocked"
+            : "HEVC using Apple hardware")
+        videoDimensions = restorationPlan.map {
+            "\($0.sourceWidth)×\($0.sourceHeight) → \($0.outputWidth)×\($0.outputHeight)"
+        } ?? summary.video.map {
+            "Preserve source (\($0.resolution)); never upscale"
+        } ?? "Unknown—conversion blocked"
         frameRate = summary.video.map { "Preserve source (\($0.frameRate))" }
             ?? "Unknown—conversion blocked"
         colorHandling = colorSelection.description

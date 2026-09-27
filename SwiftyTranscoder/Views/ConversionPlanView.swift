@@ -22,7 +22,7 @@ struct ConversionPlanView: View {
                 Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 6) {
                     planRow("Container", plan.container)
                     planRow("Video", plan.videoFormat)
-                    planRow("Dimensions", "Preserve source (\(plan.videoDimensions)); never upscale")
+                    planRow("Dimensions", plan.videoDimensions)
                     planRow("Frame rate", plan.frameRate)
                     GridRow {
                         Text("Color")
@@ -43,7 +43,7 @@ struct ConversionPlanView: View {
                     }
                     .font(.callout)
                     planRow("Audio", plan.audioFormat)
-                    planRow("Storage", plan.storageStatus)
+                    planRow("Output storage", plan.storageStatus)
                     GridRow {
                         Text("Gain")
                             .foregroundStyle(.secondary)
