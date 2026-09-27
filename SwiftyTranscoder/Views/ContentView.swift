@@ -39,6 +39,7 @@ struct ContentView: View {
     @State private var colorSelection = ColorSelection.needsConfirmation
     @State private var subtitleSelection = SubtitleSelection.needsChoice
     @State private var outputURL: URL?
+    @State private var isRestorationPreviewActive = false
     @AppStorage("savedOutputFolderPath") private var savedOutputFolderPath = ""
     @AppStorage("defaultGainEnabled") private var defaultGainEnabled = true
     @AppStorage("defaultSubtitleMode") private var defaultSubtitleMode = "recommended"
@@ -553,13 +554,27 @@ struct ContentView: View {
                 savedOutputFolderPath: $savedOutputFolderPath,
                 saveDefaults: saveCurrentDefaults
             )
-            .disabled(isBatchRunning || isBatchReady)
+            .disabled(isBatchRunning || isBatchReady || isRestorationPreviewActive)
+
+            if case .eligible(let restorationPlan) = RestorationPlanner().plan(for: inspection) {
+                RestorationPreviewView(
+                    sourceURL: sourceURL,
+                    inspection: inspection,
+                    plan: restorationPlan,
+                    gainEnabled: gainEnabled,
+                    aacStereoEnabled: aacStereoEnabled,
+                    disabled: isBatchRunning || isBatchReady || conversionController.isActive,
+                    isActive: $isRestorationPreviewActive
+                )
+            }
 
             if showsApprovalAction {
                 VideoConversionControlsView(
                     controller: conversionController,
-                    canStart: conversionBlockingReason == nil,
-                    disabledReason: conversionBlockingReason,
+                    canStart: conversionBlockingReason == nil && !isRestorationPreviewActive,
+                    disabledReason: isRestorationPreviewActive
+                        ? "Cancel or finish the restoration preview before starting conversion."
+                        : conversionBlockingReason,
                     startButtonTitle: startButtonTitle,
                     batchItemNumber: nil,
                     batchItemCount: sourceQueue.count,
