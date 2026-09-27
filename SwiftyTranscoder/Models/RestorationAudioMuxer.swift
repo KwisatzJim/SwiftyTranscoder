@@ -16,6 +16,8 @@ struct RestorationAudioMux: Sendable {
     let gainEnabled: Bool
     let aacStereoEnabled: Bool
     let scope: Scope
+    let expectedChapterCount: Int
+    let expectedContainerTitle: String?
 
     init(
         sourceURL: URL,
@@ -48,6 +50,8 @@ struct RestorationAudioMux: Sendable {
         self.gainEnabled = gainEnabled
         self.aacStereoEnabled = aacStereoEnabled
         scope = .preview
+        expectedChapterCount = 0
+        expectedContainerTitle = nil
     }
 
     init(
@@ -57,7 +61,9 @@ struct RestorationAudioMux: Sendable {
         durationSeconds: Double,
         sourceAudio: MediaStream,
         gainEnabled: Bool,
-        aacStereoEnabled: Bool
+        aacStereoEnabled: Bool,
+        expectedChapterCount: Int,
+        expectedContainerTitle: String?
     ) throws {
         guard silentVideoURL.lastPathComponent == "restored-silent.partial.mp4",
               silentVideoURL.deletingLastPathComponent().standardizedFileURL.path
@@ -70,6 +76,9 @@ struct RestorationAudioMux: Sendable {
         guard let audioSettings = CompatibilityAudioSettings(source: sourceAudio) else {
             throw RestorationAudioMuxerError.unsupportedAudioLayout
         }
+        guard expectedChapterCount >= 0 else {
+            throw RestorationAudioMuxerError.invalidChapterCount
+        }
         self.sourceURL = sourceURL
         self.silentVideoURL = silentVideoURL
         outputURL = workspaceURL.appendingPathComponent("restored-audio.partial.mp4")
@@ -80,6 +89,8 @@ struct RestorationAudioMux: Sendable {
         self.gainEnabled = gainEnabled
         self.aacStereoEnabled = aacStereoEnabled
         scope = .fullDuration
+        self.expectedChapterCount = expectedChapterCount
+        self.expectedContainerTitle = expectedContainerTitle
     }
 
     var audioLanguage: String {
@@ -125,7 +136,7 @@ struct RestorationAudioMux: Sendable {
             ]
         }
         arguments += [
-            "-map_metadata", "1", "-map_chapters", "-1",
+            "-map_metadata", "1", "-map_chapters", scope == .fullDuration ? "1" : "-1",
             "-shortest", "-avoid_negative_ts", "make_zero",
             "-movflags", "+faststart", "-progress", "pipe:1", "-nostats",
             outputURL.path(percentEncoded: false),
@@ -256,7 +267,7 @@ actor RestorationAudioMuxer: RestorationAudioMuxing {
         guard inspection.videoStreams.count == 1,
               inspection.audioStreams.count == expectedAudioCount,
               inspection.subtitleStreams.isEmpty,
-              inspection.chapters.isEmpty else {
+              inspection.chapters.count == request.expectedChapterCount else {
             throw RestorationAudioMuxerError.invalidStreamLayout
         }
         guard let video = inspection.videoStreams.first,
@@ -281,6 +292,10 @@ actor RestorationAudioMuxer: RestorationAudioMuxing {
                 throw RestorationAudioMuxerError.invalidSecondaryAudio
             }
         }
+        if let expectedTitle = request.expectedContainerTitle,
+           inspection.format.tags?["title"] != expectedTitle {
+            throw RestorationAudioMuxerError.changedContainerMetadata
+        }
         guard let durationText = inspection.format.duration,
               let duration = Double(durationText),
               abs(duration - request.durationSeconds) <= durationTolerance(for: request),
@@ -301,6 +316,7 @@ actor RestorationAudioMuxer: RestorationAudioMuxing {
 
 enum RestorationAudioMuxerError: LocalizedError, Equatable {
     case executableNotFound, alreadyRunning, invalidSilentVideoLocation, invalidTimeRange
+    case invalidChapterCount, changedContainerMetadata
     case unsupportedAudioLayout, inputMissing, outputExists, couldNotLaunch(reason: String)
     case muxFailed(exitCode: Int32, reason: String), validationProbeFailed(String)
     case invalidProbeResponse, invalidStreamLayout, invalidVideoFormat
@@ -312,6 +328,8 @@ enum RestorationAudioMuxerError: LocalizedError, Equatable {
         case .alreadyRunning: "Restoration audio muxing is already running."
         case .invalidSilentVideoLocation: "The silent restored video is not in the approved restoration workspace."
         case .invalidTimeRange: "The restoration audio time range is invalid."
+        case .invalidChapterCount: "The restoration chapter count is invalid."
+        case .changedContainerMetadata: "The restored container metadata does not match the source."
         case .unsupportedAudioLayout: "The selected audio layout is not supported by the compatibility output."
         case .inputMissing: "A restoration audio mux input is unavailable."
         case .outputExists: "The restored-audio partial output already exists and will not be overwritten."

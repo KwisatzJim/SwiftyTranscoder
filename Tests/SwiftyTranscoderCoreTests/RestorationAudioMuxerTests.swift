@@ -116,7 +116,9 @@ private struct FullAudioMuxFixture {
             durationSeconds: 120,
             sourceAudio: audio,
             gainEnabled: true,
-            aacStereoEnabled: true
+            aacStereoEnabled: true,
+            expectedChapterCount: 2,
+            expectedContainerTitle: "Episode title"
         )
     }
 
@@ -132,7 +134,7 @@ private struct FullAudioMuxFixture {
         """
         let probe = """
         #!/bin/sh
-        printf '%s' '{"streams":[{"index":0,"codec_name":"hevc","codec_tag_string":"hvc1","codec_type":"video"},{"index":1,"codec_name":"ac3","codec_type":"audio","channels":2,"channel_layout":"stereo","sample_rate":"48000","bit_rate":"192000","tags":{"language":"eng"},"disposition":{"default":1}},{"index":2,"codec_name":"aac","codec_type":"audio","channels":2,"channel_layout":"stereo","sample_rate":"48000","bit_rate":"192000","tags":{"language":"eng"},"disposition":{"default":0}}],"chapters":[],"format":{"duration":"120.000","size":"20"}}'
+        printf '%s' '{"streams":[{"index":0,"codec_name":"hevc","codec_tag_string":"hvc1","codec_type":"video"},{"index":1,"codec_name":"ac3","codec_type":"audio","channels":2,"channel_layout":"stereo","sample_rate":"48000","bit_rate":"192000","tags":{"language":"eng"},"disposition":{"default":1}},{"index":2,"codec_name":"aac","codec_type":"audio","channels":2,"channel_layout":"stereo","sample_rate":"48000","bit_rate":"192000","tags":{"language":"eng"},"disposition":{"default":0}}],"chapters":[{"id":0,"start_time":"0","end_time":"60"},{"id":1,"start_time":"60","end_time":"120"}],"format":{"duration":"120.000","size":"20","tags":{"title":"Episode title"}}}'
         exit 0
         """
         try writeExecutable(encoder, to: ffmpeg)

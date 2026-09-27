@@ -25,6 +25,30 @@ struct RestorationVideoAssemblerTests {
         #expect(!RestorationVideoAssembler.frameRatesMatch("24/1", "24000/1001"))
     }
 
+    @Test func burnsApprovedSubtitleAtAbsoluteChunkTimeDuringOnlyVideoEncode() throws {
+        let fixture = try VideoAssemblerFixture(frameCount: 2)
+        defer { fixture.remove() }
+        let source = fixture.rootURL.appendingPathComponent("source with subtitle.mkv")
+        try Data("source".utf8).write(to: source)
+        let subtitle = try RestorationSubtitleBurn(
+            sourceURL: source,
+            subtitleStreamOrdinal: 1,
+            chunkStartSeconds: 5.005
+        )
+        let assembly = try RestorationVideoAssembly(
+            frameURLs: fixture.frameURLs,
+            workspaceURL: fixture.workspaceURL,
+            plan: fixture.plan,
+            subtitleBurn: subtitle
+        )
+        let filter = try #require(assembly.ffmpegArguments.dropFirst().first { $0.contains("subtitles=") })
+
+        #expect(filter.contains("setpts=PTS+5.005000000/TB"))
+        #expect(filter.contains("stream_index=1"))
+        #expect(filter.contains("setpts=PTS-STARTPTS"))
+        #expect(filter.contains("setparams=range=limited"))
+    }
+
     @Test func rejectsIncompleteNumericSequence() throws {
         let fixture = try VideoAssemblerFixture(frameCount: 2)
         defer { fixture.remove() }

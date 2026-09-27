@@ -1,12 +1,47 @@
 import Foundation
 
+struct RestorationSubtitleBurn: Equatable, Sendable {
+    let sourceURL: URL
+    let subtitleStreamOrdinal: Int
+    let chunkStartSeconds: Double
+
+    init(sourceURL: URL, subtitleStreamOrdinal: Int, chunkStartSeconds: Double) throws {
+        guard subtitleStreamOrdinal >= 0 else {
+            throw RestorationVideoAssemblerError.invalidSubtitleStream
+        }
+        guard chunkStartSeconds >= 0, chunkStartSeconds.isFinite else {
+            throw RestorationVideoAssemblerError.invalidSubtitleTime
+        }
+        self.sourceURL = sourceURL
+        self.subtitleStreamOrdinal = subtitleStreamOrdinal
+        self.chunkStartSeconds = chunkStartSeconds
+    }
+
+    var filter: String {
+        let path = sourceURL.path(percentEncoded: false)
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
+            .replacingOccurrences(of: ":", with: "\\:")
+        return "setpts=PTS+\(String(format: "%.9f", chunkStartSeconds))/TB,"
+            + "subtitles=filename='\(path)':stream_index=\(subtitleStreamOrdinal):"
+            + "force_style='FontName=Helvetica,FontSize=22,Outline=2,Shadow=0,MarginV=36',"
+            + "setpts=PTS-STARTPTS"
+    }
+}
+
 struct RestorationVideoAssembly: Equatable, Sendable {
     let frameURLs: [URL]
     let inputPatternURL: URL
     let outputURL: URL
     let plan: RestorationPlan
+    let subtitleBurn: RestorationSubtitleBurn?
 
-    init(frameURLs: [URL], workspaceURL: URL, plan: RestorationPlan) throws {
+    init(
+        frameURLs: [URL],
+        workspaceURL: URL,
+        plan: RestorationPlan,
+        subtitleBurn: RestorationSubtitleBurn? = nil
+    ) throws {
         guard (1...240).contains(frameURLs.count) else {
             throw RestorationVideoAssemblerError.invalidFrameCount
         }
@@ -39,6 +74,7 @@ struct RestorationVideoAssembly: Equatable, Sendable {
             .appendingPathComponent("frame-%0\(width)d.png")
         outputURL = workspaceURL.appendingPathComponent("restored-video.partial.mp4")
         self.plan = plan
+        self.subtitleBurn = subtitleBurn
     }
 
     var expectedDuration: Double {
@@ -46,14 +82,16 @@ struct RestorationVideoAssembly: Equatable, Sendable {
     }
 
     var ffmpegArguments: [String] {
-        [
+        var filters = subtitleBurn.map { [$0.filter] } ?? []
+        filters.append("setparams=range=limited:color_primaries=\(plan.colorPrimaries):color_trc=\(plan.colorTransfer):colorspace=\(plan.colorSpace)")
+        return [
             "-hide_banner", "-nostdin", "-n", "-loglevel", "error",
             "-framerate", plan.frameRate,
             "-start_number", "1",
             "-i", inputPatternURL.path(percentEncoded: false),
             "-frames:v", String(frameURLs.count),
             "-an", "-sn", "-dn",
-            "-vf", "setparams=range=limited:color_primaries=\(plan.colorPrimaries):color_trc=\(plan.colorTransfer):colorspace=\(plan.colorSpace)",
+            "-vf", filters.joined(separator: ","),
             "-c:v", "hevc_videotoolbox",
             "-allow_sw", "0",
             "-profile:v", "main",
@@ -189,6 +227,10 @@ actor RestorationVideoAssembler: RestorationVideoAssembling {
         guard assembly.frameURLs.allSatisfy({ fileManager.fileExists(atPath: $0.path) }) else {
             throw RestorationVideoAssemblerError.sourceFrameMissing
         }
+        if let subtitleBurn = assembly.subtitleBurn,
+           !fileManager.fileExists(atPath: subtitleBurn.sourceURL.path) {
+            throw RestorationVideoAssemblerError.subtitleSourceMissing
+        }
         guard !fileManager.fileExists(atPath: assembly.outputURL.path) else {
             throw RestorationVideoAssemblerError.outputExists
         }
@@ -278,6 +320,7 @@ actor RestorationVideoAssembler: RestorationVideoAssembling {
 enum RestorationVideoAssemblerError: LocalizedError, Equatable {
     case executableNotFound, alreadyRunning, invalidFrameCount, invalidFrameRate
     case invalidDimensions, invalidColorMetadata, invalidFrameSequence
+    case invalidSubtitleStream, invalidSubtitleTime, subtitleSourceMissing
     case sourceFrameMissing, outputExists, couldNotLaunch(reason: String)
     case encodingFailed(exitCode: Int32, reason: String)
     case validationProbeFailed(String), invalidProbeResponse, invalidStreamLayout
@@ -293,6 +336,9 @@ enum RestorationVideoAssemblerError: LocalizedError, Equatable {
         case .invalidDimensions: "The restored video dimensions must be positive even numbers."
         case .invalidColorMetadata: "The restored video requires explicit limited-range SDR color metadata."
         case .invalidFrameSequence: "The restored frames are not one complete ordered numeric sequence."
+        case .invalidSubtitleStream: "The restoration subtitle stream is invalid."
+        case .invalidSubtitleTime: "The restoration subtitle chunk time is invalid."
+        case .subtitleSourceMissing: "The restoration subtitle source is no longer available."
         case .sourceFrameMissing: "A restored source frame is unavailable."
         case .outputExists: "The restored-video partial output already exists and will not be overwritten."
         case .couldNotLaunch(let reason): "Could not start a media helper: \(reason)"
