@@ -39,7 +39,7 @@ struct RestorationPlanChoiceView: View {
                     }
 
                     Label(
-                        "Planning review only. Full-file execution remains disabled while final destination validation and pipeline coordination are added.",
+                        "Planning review only. Full-file execution remains disabled while the validated stages are connected into one cancellable pipeline.",
                         systemImage: "info.circle.fill"
                     )
                     .font(.caption)
