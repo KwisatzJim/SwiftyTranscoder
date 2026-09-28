@@ -1,5 +1,10 @@
 import Foundation
 
+protocol RestorationOutputPromoting: Sendable {
+    func stage(_ request: RestorationOutputPromotion) async throws -> URL
+    func promote(_ request: RestorationOutputPromotion) async throws -> URL
+}
+
 struct RestorationOutputPromotion: Equatable, Sendable {
     let validatedOutputURL: URL
     let partialOutputURL: URL
@@ -177,5 +182,21 @@ enum RestorationOutputPromoterError: LocalizedError, Equatable {
         case .outputAppeared(let file):
             "The destination \(file) appeared while restoration was running and was not overwritten."
         }
+    }
+}
+
+actor RestorationOutputPromotionService: RestorationOutputPromoting {
+    private let promoter: RestorationOutputPromoter
+
+    init(promoter: RestorationOutputPromoter = RestorationOutputPromoter()) {
+        self.promoter = promoter
+    }
+
+    func stage(_ request: RestorationOutputPromotion) throws -> URL {
+        try promoter.stage(request)
+    }
+
+    func promote(_ request: RestorationOutputPromotion) throws -> URL {
+        try promoter.promote(request)
     }
 }

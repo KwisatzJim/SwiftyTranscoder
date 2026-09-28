@@ -1,5 +1,11 @@
 import Foundation
 
+protocol RestorationSegmentConcatenating: Sendable {
+    func concatenate(_ request: RestorationSegmentConcatenation) async throws -> URL
+    func cancel() async
+    func currentProgress() async -> Double
+}
+
 struct RestorationSegmentConcatenation: Equatable, Sendable {
     let segmentURLs: [URL]
     let manifestURL: URL
@@ -166,6 +172,8 @@ actor RestorationSegmentConcatenator {
         process?.terminate()
     }
 
+    func currentProgress() -> Double { progress }
+
     private func prepare(_ request: RestorationSegmentConcatenation) throws {
         let fileManager = FileManager.default
         guard request.segmentURLs.allSatisfy({ fileManager.fileExists(atPath: $0.path) }) else {
@@ -248,6 +256,8 @@ actor RestorationSegmentConcatenator {
         }
     }
 }
+
+extension RestorationSegmentConcatenator: RestorationSegmentConcatenating {}
 
 enum RestorationSegmentConcatenatorError: LocalizedError, Equatable {
     case executableNotFound, alreadyRunning, invalidSegmentCount, invalidFrameRate

@@ -71,6 +71,12 @@ protocol RestorationChunkProcessing: Sendable {
     func cancel() async
 }
 
+protocol RestorationChunkCoordinating: Sendable {
+    func run(_ plan: RestorationChunkPlan) async throws -> [URL]
+    func cancel() async
+    func currentProgress() async -> Double
+}
+
 actor RestorationChunkCoordinator {
     private let processor: any RestorationChunkProcessing
     private var cancellationRequested = false
@@ -116,6 +122,8 @@ actor RestorationChunkCoordinator {
         await processor.cancel()
     }
 
+    func currentProgress() -> Double { progress }
+
     private func checkCancellation() throws {
         if cancellationRequested || Task.isCancelled { throw CancellationError() }
     }
@@ -129,6 +137,8 @@ actor RestorationChunkCoordinator {
         }
     }
 }
+
+extension RestorationChunkCoordinator: RestorationChunkCoordinating {}
 
 enum RestorationChunkError: LocalizedError, Equatable {
     case invalidFrameCount
