@@ -39,7 +39,7 @@ struct RestorationPlanChoiceView: View {
                     }
 
                     Label(
-                        "Planning review only. Full-file execution remains disabled while the production chunk processor and app controls are connected.",
+                        "Planning review only. Full-file execution remains disabled while the production pipeline is constructed and connected to app controls.",
                         systemImage: "info.circle.fill"
                     )
                     .font(.caption)

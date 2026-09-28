@@ -69,6 +69,11 @@ struct RestorationChunkPlan: Equatable, Sendable {
 protocol RestorationChunkProcessing: Sendable {
     func process(_ chunk: RestorationChunk) async throws -> URL
     func cancel() async
+    func currentProgress() async -> Double
+}
+
+extension RestorationChunkProcessing {
+    func currentProgress() async -> Double { 0 }
 }
 
 protocol RestorationChunkCoordinating: Sendable {
@@ -81,6 +86,7 @@ actor RestorationChunkCoordinator {
     private let processor: any RestorationChunkProcessing
     private var cancellationRequested = false
     private var hasStarted = false
+    private var totalChunkCount = 0
     private(set) var completedChunkCount = 0
     private(set) var progress = 0.0
 
@@ -91,6 +97,7 @@ actor RestorationChunkCoordinator {
     func run(_ plan: RestorationChunkPlan) async throws -> [URL] {
         guard !hasStarted else { throw RestorationChunkError.alreadyRun }
         hasStarted = true
+        totalChunkCount = plan.chunks.count
         cancellationRequested = false
         progress = 0
         var segments: [URL] = []
@@ -122,7 +129,14 @@ actor RestorationChunkCoordinator {
         await processor.cancel()
     }
 
-    func currentProgress() -> Double { progress }
+    func currentProgress() async -> Double {
+        guard totalChunkCount > 0 else { return progress }
+        let childProgress = min(max(await processor.currentProgress(), 0), 1)
+        return min(
+            (Double(completedChunkCount) + childProgress) / Double(totalChunkCount),
+            1
+        )
+    }
 
     private func checkCancellation() throws {
         if cancellationRequested || Task.isCancelled { throw CancellationError() }
