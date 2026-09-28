@@ -10,6 +10,7 @@ struct FullVideoRestorationRequest: Sendable {
     let sourceAudio: MediaStream
     let gainEnabled: Bool
     let aacStereoEnabled: Bool
+    let subtitleStreamOrdinal: Int?
     let expectedChapterCount: Int
     let expectedContainerTitle: String?
 
@@ -23,6 +24,7 @@ struct FullVideoRestorationRequest: Sendable {
         sourceAudio: MediaStream,
         gainEnabled: Bool,
         aacStereoEnabled: Bool,
+        subtitleStreamOrdinal: Int? = nil,
         expectedChapterCount: Int,
         expectedContainerTitle: String?
     ) throws {
@@ -34,6 +36,9 @@ struct FullVideoRestorationRequest: Sendable {
         }
         guard expectedChapterCount >= 0 else {
             throw FullVideoRestorationError.invalidChapterCount
+        }
+        if let subtitleStreamOrdinal, subtitleStreamOrdinal < 0 {
+            throw FullVideoRestorationError.invalidSubtitleStream
         }
         guard CompatibilityAudioSettings(source: sourceAudio) != nil else {
             throw FullVideoRestorationError.unsupportedAudio
@@ -61,6 +66,7 @@ struct FullVideoRestorationRequest: Sendable {
         self.sourceAudio = sourceAudio
         self.gainEnabled = gainEnabled
         self.aacStereoEnabled = aacStereoEnabled
+        self.subtitleStreamOrdinal = subtitleStreamOrdinal
         self.expectedChapterCount = expectedChapterCount
         self.expectedContainerTitle = expectedContainerTitle
     }
@@ -298,6 +304,7 @@ enum FullVideoRestorationError: LocalizedError, Equatable {
     case invalidWorkspaceName
     case invalidDurationOrFrameCount
     case invalidChapterCount
+    case invalidSubtitleStream
     case unsupportedAudio
     case sourceMissing
     case workspaceExists
@@ -310,6 +317,7 @@ enum FullVideoRestorationError: LocalizedError, Equatable {
         case .invalidWorkspaceName: "The full restoration workspace name is not safely recognizable."
         case .invalidDurationOrFrameCount: "The full restoration duration or frame count is invalid."
         case .invalidChapterCount: "The full restoration chapter count is invalid."
+        case .invalidSubtitleStream: "The full restoration subtitle stream is invalid."
         case .unsupportedAudio: "The full restoration audio layout is unsupported."
         case .sourceMissing: "The full restoration source is unavailable."
         case .workspaceExists: "The full restoration workspace already exists and will not be reused."

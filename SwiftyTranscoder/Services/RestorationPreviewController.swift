@@ -46,7 +46,7 @@ final class RestorationPreviewController: ObservableObject {
         let frameCount = min(240, max(1, Int((durationSeconds * frameRate).rounded())))
 
         do {
-            let modelURL = try RestorationPreviewModelLocator.modelURL()
+            let modelURL = try FullVideoRestorationResources.locate().modelURL
             let tiles = try CoreMLRestorationTileProcessor(modelURL: modelURL)
             let frames = RestorationFrameProcessor(tileProcessor: tiles)
             let extractor = try RestorationFrameExtractor()
@@ -132,38 +132,5 @@ final class RestorationPreviewController: ObservableObject {
         let parts = value.split(separator: "/", maxSplits: 1).compactMap { Double($0) }
         guard parts.count == 2, parts[0] > 0, parts[1] > 0 else { return nil }
         return parts[0] / parts[1]
-    }
-}
-
-private enum RestorationPreviewModelLocator {
-    static func modelURL(fileManager: FileManager = .default) throws -> URL {
-        let name = "RealESRGAN_x2plus_522_fp16"
-        if let bundled = Bundle.main.url(
-            forResource: name,
-            withExtension: "mlpackage",
-            subdirectory: "Models"
-        ) {
-            return bundled
-        }
-        let sourceRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let development = sourceRoot.appendingPathComponent(
-            ".build/restoration-evaluation/converter/weights/\(name).mlpackage",
-            isDirectory: true
-        )
-        guard fileManager.fileExists(atPath: development.path) else {
-            throw RestorationPreviewControllerError.modelUnavailable
-        }
-        return development
-    }
-}
-
-private enum RestorationPreviewControllerError: LocalizedError {
-    case modelUnavailable
-
-    var errorDescription: String? {
-        "The restoration model is unavailable. Run Scripts/prepare-restoration-model.sh, then rebuild SwiftyTranscoder."
     }
 }
