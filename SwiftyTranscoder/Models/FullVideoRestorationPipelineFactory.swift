@@ -58,7 +58,13 @@ struct FullVideoRestorationResources: Equatable, Sendable {
     }
 }
 
-struct FullVideoRestorationPipelineFactory: Sendable {
+protocol FullVideoRestorationPipelineBuilding: Sendable {
+    func makePipeline(
+        for request: FullVideoRestorationRequest
+    ) throws -> any FullVideoRestorationPipelineRunning
+}
+
+struct FullVideoRestorationPipelineFactory: FullVideoRestorationPipelineBuilding, Sendable {
     let resources: FullVideoRestorationResources
 
     init(resources: FullVideoRestorationResources) {
@@ -75,7 +81,9 @@ struct FullVideoRestorationPipelineFactory: Sendable {
         )
     }
 
-    func makePipeline(for request: FullVideoRestorationRequest) throws -> FullVideoRestorationPipeline {
+    func makePipeline(
+        for request: FullVideoRestorationRequest
+    ) throws -> any FullVideoRestorationPipelineRunning {
         let tileProcessor = try CoreMLRestorationTileProcessor(modelURL: resources.modelURL)
         let frameProcessor = RestorationFrameProcessor(tileProcessor: tileProcessor)
         let chunkProcessor = try FullRestorationChunkProcessor(

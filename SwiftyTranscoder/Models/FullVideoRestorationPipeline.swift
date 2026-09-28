@@ -96,7 +96,14 @@ enum FullVideoRestorationState: Equatable, Sendable {
     case failed(String, partialOutput: URL?)
 }
 
-actor FullVideoRestorationPipeline {
+protocol FullVideoRestorationPipelineRunning: Sendable {
+    func run(_ request: FullVideoRestorationRequest) async -> FullVideoRestorationState
+    func cancel() async
+    func currentProgress() async -> Double
+    func currentState() async -> FullVideoRestorationState
+}
+
+actor FullVideoRestorationPipeline: FullVideoRestorationPipelineRunning {
     private let chunkCoordinator: any RestorationChunkCoordinating
     private let segmentConcatenator: any RestorationSegmentConcatenating
     private let audioMuxer: any RestorationAudioMuxing
@@ -233,6 +240,9 @@ actor FullVideoRestorationPipeline {
         case .stagingDestination, .promotingDestination: break
         }
     }
+
+    func currentProgress() -> Double { progress }
+    func currentState() -> FullVideoRestorationState { state }
 
     private var isActive: Bool {
         switch state {
