@@ -21,6 +21,7 @@ final class FullVideoRestorationController: ObservableObject {
     private var pipeline: (any FullVideoRestorationPipelineRunning)?
     private var runTask: Task<Void, Never>?
     private var monitorTask: Task<Void, Never>?
+    private var systemActivity: NSObjectProtocol?
     private var cancellationRequested = false
 
     init(
@@ -31,16 +32,9 @@ final class FullVideoRestorationController: ObservableObject {
         self.temporaryDirectory = temporaryDirectory
     }
 
-    convenience init(
-        bundleURL: URL = Bundle.main.bundleURL,
-        fileManager: FileManager = .default
-    ) throws {
-        try self.init(
-            pipelineBuilder: FullVideoRestorationPipelineFactory(
-                bundleURL: bundleURL,
-                fileManager: fileManager
-            ),
-            temporaryDirectory: fileManager.temporaryDirectory
+    convenience init(bundleURL: URL = Bundle.main.bundleURL) {
+        self.init(
+            pipelineBuilder: BundledFullVideoRestorationPipelineBuilder(bundleURL: bundleURL)
         )
     }
 
@@ -49,6 +43,10 @@ final class FullVideoRestorationController: ObservableObject {
         case .preparing, .running, .cancelling: true
         default: false
         }
+    }
+
+    var isPreventingIdleSystemSleep: Bool {
+        systemActivity != nil
     }
 
     func start(
@@ -75,6 +73,7 @@ final class FullVideoRestorationController: ObservableObject {
             phase = .preparing
             progress = 0
             cancellationRequested = false
+            beginSystemActivity()
             let pipelineBuilder = self.pipelineBuilder
             runTask = Task { [weak self] in
                 do {
@@ -124,6 +123,30 @@ final class FullVideoRestorationController: ObservableObject {
         guard !isActive else { return }
         phase = .idle
         progress = 0
+    }
+
+    func movePartialOutputToTrash(_ detectedPartialOutputURL: URL? = nil) throws {
+        guard !isActive,
+              let partialOutputURL = detectedPartialOutputURL ?? partialOutputURL else {
+            throw FullVideoRestorationControllerError.noPartialOutput
+        }
+        guard partialOutputURL.lastPathComponent.hasSuffix(".partial.mp4") else {
+            throw FullVideoRestorationControllerError.unsafePartialOutputName
+        }
+
+        var trashedURL: NSURL?
+        try FileManager.default.trashItem(
+            at: partialOutputURL,
+            resultingItemURL: &trashedURL
+        )
+        reset()
+    }
+
+    private var partialOutputURL: URL? {
+        switch phase {
+        case .cancelled(let partialOutput), .failed(_, let partialOutput): partialOutput
+        default: nil
+        }
     }
 
     private func makeRequest(
@@ -210,9 +233,24 @@ final class FullVideoRestorationController: ObservableObject {
         monitorTask?.cancel()
         monitorTask = nil
         runTask = nil
+        endSystemActivity()
         progress = min(max(finalProgress, 0), 1)
         apply(state)
         pipeline = nil
+    }
+
+    private func beginSystemActivity() {
+        guard systemActivity == nil else { return }
+        systemActivity = ProcessInfo.processInfo.beginActivity(
+            options: [.userInitiated, .idleSystemSleepDisabled],
+            reason: "SwiftyTranscoder is restoring video"
+        )
+    }
+
+    private func endSystemActivity() {
+        guard let systemActivity else { return }
+        ProcessInfo.processInfo.endActivity(systemActivity)
+        self.systemActivity = nil
     }
 
     private func apply(_ state: FullVideoRestorationState) {
@@ -236,6 +274,8 @@ enum FullVideoRestorationControllerError: LocalizedError, Equatable {
     case unresolvedSubtitleChoice
     case subtitleMissing(Int)
     case unsupportedSubtitle(Int)
+    case noPartialOutput
+    case unsafePartialOutputName
 
     var errorDescription: String? {
         switch self {
@@ -249,6 +289,10 @@ enum FullVideoRestorationControllerError: LocalizedError, Equatable {
             "Subtitle stream \(index) is no longer available."
         case .unsupportedSubtitle(let index):
             "Subtitle stream \(index) is not a supported SubRip text track."
+        case .noPartialOutput:
+            "There is no incomplete restoration output to move."
+        case .unsafePartialOutputName:
+            "Only a clearly labeled .partial.mp4 restoration output can be moved to the Trash."
         }
     }
 }

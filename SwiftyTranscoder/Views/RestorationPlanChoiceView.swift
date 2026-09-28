@@ -39,8 +39,8 @@ struct RestorationPlanChoiceView: View {
                     }
 
                     Label(
-                        "Planning review only. Full-file execution remains disabled while its reviewed progress and cancellation controls are added.",
-                        systemImage: "info.circle.fill"
+                        "The full video will use the reviewed restoration plan. This can take substantially longer than an ordinary conversion.",
+                        systemImage: "clock.badge.exclamationmark"
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)

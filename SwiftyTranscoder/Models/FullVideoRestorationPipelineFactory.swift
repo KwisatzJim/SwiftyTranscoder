@@ -64,6 +64,21 @@ protocol FullVideoRestorationPipelineBuilding: Sendable {
     ) throws -> any FullVideoRestorationPipelineRunning
 }
 
+struct BundledFullVideoRestorationPipelineBuilder: FullVideoRestorationPipelineBuilding, Sendable {
+    let bundleURL: URL
+
+    init(bundleURL: URL = Bundle.main.bundleURL) {
+        self.bundleURL = bundleURL
+    }
+
+    func makePipeline(
+        for request: FullVideoRestorationRequest
+    ) throws -> any FullVideoRestorationPipelineRunning {
+        try FullVideoRestorationPipelineFactory(bundleURL: bundleURL)
+            .makePipeline(for: request)
+    }
+}
+
 struct FullVideoRestorationPipelineFactory: FullVideoRestorationPipelineBuilding, Sendable {
     let resources: FullVideoRestorationResources
 

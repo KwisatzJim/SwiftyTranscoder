@@ -19,6 +19,7 @@ struct ContentView: View {
     }
 
     @StateObject private var conversionController = VideoConversionController()
+    @StateObject private var restorationController = FullVideoRestorationController()
     @State private var wizardStep = WizardStep.choose
     @State private var technicalDetailsExpanded = false
     @State private var isChoosingSource = false
@@ -289,7 +290,10 @@ struct ContentView: View {
     @ViewBuilder
     private var convertStep: some View {
         if let selectedSource, let inspection {
-            let blockingReason = conversionBlockingReason(inspection: inspection)
+            let restorationPlan = eligibleRestorationPlan(for: inspection)
+            let blockingReason = restorationEnabled
+                ? restorationConversionBlockingReason(inspection: inspection)
+                : conversionBlockingReason(inspection: inspection)
 
             VStack(spacing: 14) {
                 if sourceQueue.count > 1 {
@@ -301,20 +305,31 @@ struct ContentView: View {
                     batchReadyView
                 }
 
-                VideoConversionControlsView(
-                    controller: conversionController,
-                    canStart: blockingReason == nil
-                        && (!isBatchReady || batchHasSufficientSpace && duplicateBatchOutputURLs.isEmpty),
-                    disabledReason: blockingReason,
-                    startButtonTitle: startButtonTitle,
-                    batchItemNumber: isBatchRunning ? currentQueueIndex + 1 : nil,
-                    batchItemCount: sourceQueue.count,
-                    completedBatchCount: completedQueueIndexes.count,
-                    existingPartialOutput: existingPartialOutput,
-                    start: { performPrimaryAction(sourceURL: selectedSource, inspection: inspection) }
-                )
+                if restorationEnabled, restorationPlan != nil {
+                    FullVideoRestorationControlsView(
+                        controller: restorationController,
+                        canStart: blockingReason == nil,
+                        disabledReason: blockingReason,
+                        existingPartialOutput: existingPartialOutput,
+                        start: { performPrimaryAction(sourceURL: selectedSource, inspection: inspection) }
+                    )
+                } else {
+                    VideoConversionControlsView(
+                        controller: conversionController,
+                        canStart: blockingReason == nil
+                            && (!isBatchReady || batchHasSufficientSpace && duplicateBatchOutputURLs.isEmpty),
+                        disabledReason: blockingReason,
+                        startButtonTitle: startButtonTitle,
+                        batchItemNumber: isBatchRunning ? currentQueueIndex + 1 : nil,
+                        batchItemCount: sourceQueue.count,
+                        completedBatchCount: completedQueueIndexes.count,
+                        existingPartialOutput: existingPartialOutput,
+                        start: { performPrimaryAction(sourceURL: selectedSource, inspection: inspection) }
+                    )
+                }
 
-                if !conversionController.isActive && !isBatchRunning && !isBatchReady {
+                if !conversionController.isActive && !restorationController.isActive
+                    && !isBatchRunning && !isBatchReady {
                     Button("Choose More Videos…", systemImage: "folder") {
                         isChoosingSource = true
                     }
@@ -530,14 +545,9 @@ struct ContentView: View {
         sourceURL: URL,
         showsApprovalAction: Bool
     ) -> some View {
-        let restorationEligibility = RestorationPlanner().plan(for: inspection)
-        let restorationPlan: RestorationPlan? = if case .eligible(let plan) = restorationEligibility {
-            plan
-        } else {
-            nil
-        }
+        let restorationPlan = eligibleRestorationPlan(for: inspection)
         let conversionBlockingReason = restorationEnabled
-            ? "Full-file restoration execution is not enabled yet. Turn restoration off to use the ordinary conversion path."
+            ? restorationConversionBlockingReason(inspection: inspection)
             : conversionBlockingReason(inspection: inspection)
 
         return VStack(spacing: 14) {
@@ -586,19 +596,31 @@ struct ContentView: View {
             }
 
             if showsApprovalAction {
-                VideoConversionControlsView(
-                    controller: conversionController,
-                    canStart: conversionBlockingReason == nil && !isRestorationPreviewActive,
-                    disabledReason: isRestorationPreviewActive
-                        ? "Cancel or finish the restoration preview before starting conversion."
-                        : conversionBlockingReason,
-                    startButtonTitle: startButtonTitle,
-                    batchItemNumber: nil,
-                    batchItemCount: sourceQueue.count,
-                    completedBatchCount: completedQueueIndexes.count,
-                    existingPartialOutput: existingPartialOutput,
-                    start: { performPrimaryAction(sourceURL: sourceURL, inspection: inspection) }
-                )
+                if restorationEnabled {
+                    FullVideoRestorationControlsView(
+                        controller: restorationController,
+                        canStart: conversionBlockingReason == nil && !isRestorationPreviewActive,
+                        disabledReason: isRestorationPreviewActive
+                            ? "Cancel or finish the restoration preview before starting conversion."
+                            : conversionBlockingReason,
+                        existingPartialOutput: existingPartialOutput,
+                        start: { performPrimaryAction(sourceURL: sourceURL, inspection: inspection) }
+                    )
+                } else {
+                    VideoConversionControlsView(
+                        controller: conversionController,
+                        canStart: conversionBlockingReason == nil && !isRestorationPreviewActive,
+                        disabledReason: isRestorationPreviewActive
+                            ? "Cancel or finish the restoration preview before starting conversion."
+                            : conversionBlockingReason,
+                        startButtonTitle: startButtonTitle,
+                        batchItemNumber: nil,
+                        batchItemCount: sourceQueue.count,
+                        completedBatchCount: completedQueueIndexes.count,
+                        existingPartialOutput: existingPartialOutput,
+                        start: { performPrimaryAction(sourceURL: sourceURL, inspection: inspection) }
+                    )
+                }
             }
         }
     }
@@ -699,6 +721,7 @@ struct ContentView: View {
 
     private func loadSource(_ source: URL) {
         conversionController.reset()
+        restorationController.reset()
         selectedSource = source
         inspection = nil
         gainEnabled = defaultGainEnabled
@@ -778,6 +801,40 @@ struct ContentView: View {
         }
     }
 
+    private func eligibleRestorationPlan(for inspection: MediaInspection) -> RestorationPlan? {
+        guard case .eligible(let plan) = RestorationPlanner().plan(for: inspection) else {
+            return nil
+        }
+        return plan
+    }
+
+    private func restorationConversionBlockingReason(inspection: MediaInspection) -> String? {
+        guard !restorationController.isActive else { return nil }
+        guard sourceQueue.count == 1 else {
+            return "Full-video AI restoration is currently available for one video at a time."
+        }
+        guard let plan = eligibleRestorationPlan(for: inspection) else {
+            return "This video is not eligible for the reviewed AI restoration plan."
+        }
+        guard let size = inspection.format.size.flatMap(Int64.init),
+              let duration = inspection.format.duration.flatMap(Double.init),
+              let requirement = RestorationStorageRequirement.estimate(
+                sourceBytes: size,
+                durationSeconds: duration,
+                frameRate: plan.frameRate,
+                plan: plan
+              ) else {
+            return "AI restoration requires valid source duration and size metadata."
+        }
+        if let available = try? FileManager.default.temporaryDirectory.resourceValues(
+            forKeys: [.volumeAvailableCapacityForImportantUsageKey]
+        ).volumeAvailableCapacityForImportantUsage,
+           available < requirement.temporaryBytes {
+            return "The temporary volume does not have enough free space for this restoration."
+        }
+        return conversionBlockingReason(inspection: inspection)
+    }
+
     private var existingPartialOutput: URL? {
         guard let outputURL else { return nil }
         let partialURL = VideoConversionCommand.partialOutputURL(for: outputURL)
@@ -815,10 +872,31 @@ struct ContentView: View {
         }
     }
 
+    private func startFullVideoRestoration(sourceURL: URL, inspection: MediaInspection) {
+        guard let outputURL,
+              let plan = eligibleRestorationPlan(for: inspection) else {
+            selectionError = "The reviewed AI restoration plan is no longer available."
+            return
+        }
+        restorationController.start(
+            sourceURL: sourceURL,
+            inspection: inspection,
+            outputURL: outputURL,
+            plan: plan,
+            gainEnabled: gainEnabled,
+            aacStereoEnabled: aacStereoEnabled,
+            subtitleSelection: subtitleSelection
+        )
+    }
+
     private func approveOrStart(sourceURL: URL, inspection: MediaInspection) {
         guard sourceQueue.count > 1 else {
             wizardStep = .convert
-            startVideoConversion(sourceURL: sourceURL, inspection: inspection)
+            if restorationEnabled {
+                startFullVideoRestoration(sourceURL: sourceURL, inspection: inspection)
+            } else {
+                startVideoConversion(sourceURL: sourceURL, inspection: inspection)
+            }
             return
         }
 
