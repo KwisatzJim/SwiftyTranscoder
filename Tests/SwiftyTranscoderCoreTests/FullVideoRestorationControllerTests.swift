@@ -30,7 +30,7 @@ struct FullVideoRestorationControllerTests {
         let request = try #require(builder.request)
         #expect(request.sourceURL == sourceURL)
         #expect(request.finalOutputURL == outputURL)
-        #expect(request.totalFrameCount == 240)
+        #expect(request.totalFrameCount == 237)
         #expect(request.subtitleStreamOrdinal == 1)
         #expect(request.expectedChapterCount == 1)
         #expect(request.expectedContainerTitle == "Example Episode")
@@ -142,7 +142,7 @@ struct FullVideoRestorationControllerTests {
                     width: 624, height: 352, pixelFormat: "yuv420p",
                     colorRange: "tv", colorSpace: "smpte170m",
                     colorTransfer: "bt709", colorPrimaries: "smpte170m",
-                    averageFrameRate: "24000/1001"
+                    averageFrameRate: "24000/1001", numberOfFrames: "237"
                 ),
                 mediaStream(
                     index: 1, codecName: "aac", codecType: "audio",

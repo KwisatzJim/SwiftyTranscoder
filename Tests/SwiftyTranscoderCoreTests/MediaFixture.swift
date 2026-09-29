@@ -12,6 +12,7 @@ func mediaStream(
     colorTransfer: String? = nil,
     colorPrimaries: String? = nil,
     averageFrameRate: String? = nil,
+    numberOfFrames: String? = nil,
     channels: Int? = nil,
     channelLayout: String? = nil,
     sampleRate: String? = nil,
@@ -25,7 +26,7 @@ func mediaStream(
         profile: profile, codecType: codecType, width: width, height: height,
         pixelFormat: pixelFormat, colorRange: colorRange, colorSpace: colorSpace,
         colorTransfer: colorTransfer, colorPrimaries: colorPrimaries,
-        averageFrameRate: averageFrameRate, channels: channels,
+        averageFrameRate: averageFrameRate, numberOfFrames: numberOfFrames, channels: channels,
         channelLayout: channelLayout, sampleRate: sampleRate, bitRate: nil, tags: tags,
         disposition: StreamDisposition(
             isDefault: nil, forced: forced, hearingImpaired: hearingImpaired, attachedPicture: nil

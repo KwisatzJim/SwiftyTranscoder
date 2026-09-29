@@ -203,6 +203,7 @@ struct FullVideoRestorationPipelineFactoryTests {
         #expect(video.width == 1248)
         #expect(video.height == 704)
         #expect(video.averageFrameRate == "24000/1001")
+        #expect(video.numberOfFrames == "2")
         #expect(inspection.audioStreams.map(\.codecName) == ["ac3", "aac"])
         #expect(inspection.audioStreams.first?.disposition?.isDefault == 1)
     }

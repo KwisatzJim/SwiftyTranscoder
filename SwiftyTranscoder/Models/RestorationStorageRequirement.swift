@@ -12,16 +12,23 @@ struct RestorationStorageRequirement: Equatable, Sendable {
         sourceBytes: Int64,
         durationSeconds: Double,
         frameRate: String,
+        exactFrameCount: Int64? = nil,
         plan: RestorationPlan
     ) -> RestorationStorageRequirement? {
         guard sourceBytes >= 0, durationSeconds > 0,
               plan.sourceWidth > 0, plan.sourceHeight > 0,
               plan.outputWidth > 0, plan.outputHeight > 0,
               let framesPerSecond = frameRateValue(frameRate) else { return nil }
-        let frameCountValue = (durationSeconds * framesPerSecond).rounded(.up)
-        guard frameCountValue.isFinite, frameCountValue > 0,
-              frameCountValue <= Double(Int64.max) else { return nil }
-        let frameCount = Int64(frameCountValue)
+        let estimatedFrameCount = durationSeconds * framesPerSecond
+        guard estimatedFrameCount.isFinite, estimatedFrameCount > 0,
+              estimatedFrameCount <= Double(Int64.max) else { return nil }
+        let frameCount: Int64
+        if let exactFrameCount {
+            guard exactFrameCount > 0 else { return nil }
+            frameCount = exactFrameCount
+        } else {
+            frameCount = Int64(estimatedFrameCount.rounded(.up))
+        }
         let maximumResidentFrameCount = min(
             frameCount,
             Int64(RestorationChunkPlan.defaultFrameLimit)

@@ -74,6 +74,7 @@ struct RestorationPlanChoiceView: View {
             sourceBytes: size,
             durationSeconds: duration,
             frameRate: plan.frameRate,
+            exactFrameCount: inspection.videoStreams.first?.numberOfFrames.flatMap(Int64.init),
             plan: plan
         )
     }

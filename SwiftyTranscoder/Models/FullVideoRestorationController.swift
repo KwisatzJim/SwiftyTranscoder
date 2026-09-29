@@ -164,6 +164,7 @@ final class FullVideoRestorationController: ObservableObject {
                 sourceBytes: sourceBytes,
                 durationSeconds: duration,
                 frameRate: plan.frameRate,
+                exactFrameCount: exactVideoFrameCount(in: inspection),
                 plan: plan
               ) else {
             throw FullVideoRestorationControllerError.invalidDurationOrSize
@@ -210,6 +211,12 @@ final class FullVideoRestorationController: ObservableObject {
             expectedChapterCount: inspection.chapters.count,
             expectedContainerTitle: title
         )
+    }
+
+    private func exactVideoFrameCount(in inspection: MediaInspection) -> Int64? {
+        guard let value = inspection.videoStreams.first?.numberOfFrames,
+              let count = Int64(value), count > 0 else { return nil }
+        return count
     }
 
     private func startMonitoring(_ pipeline: any FullVideoRestorationPipelineRunning) {

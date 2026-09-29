@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import SwiftyTranscoderCore
 
@@ -27,6 +28,25 @@ struct RestorationStorageRequirementTests {
             sourceBytes: .max, durationSeconds: .greatestFiniteMagnitude,
             frameRate: "24/1", plan: Self.plan
         ) == nil)
+    }
+
+    @Test func exactProbeCountOverridesLongerContainerDuration() throws {
+        let estimate = try #require(RestorationStorageRequirement.estimate(
+            sourceBytes: 284_751_879,
+            durationSeconds: 2_702.613_333,
+            frameRate: "77756400/3243011",
+            exactFrameCount: 64_797,
+            plan: Self.plan
+        ))
+
+        #expect(estimate.frameCount == 64_797)
+        #expect(estimate.chunkCount == 540)
+        let chunks = try RestorationChunkPlan(
+            totalFrameCount: estimate.frameCount,
+            frameRate: "77756400/3243011",
+            workspaceURL: URL(fileURLWithPath: "/private/tmp/SwiftyTranscoder-Restoration-Test")
+        ).chunks
+        #expect(chunks.last?.frameCount == 117)
     }
 
     private static let plan = RestorationPlan(

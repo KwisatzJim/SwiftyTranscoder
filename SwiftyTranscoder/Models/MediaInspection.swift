@@ -26,6 +26,7 @@ struct MediaStream: Decodable, Identifiable, Sendable {
     let colorTransfer: String?
     let colorPrimaries: String?
     let averageFrameRate: String?
+    let numberOfFrames: String?
     let channels: Int?
     let channelLayout: String?
     let sampleRate: String?
@@ -35,6 +36,52 @@ struct MediaStream: Decodable, Identifiable, Sendable {
 
     var id: Int { index }
     var subtitleEvidence: SubtitleTrackEvidence? { SubtitleTrackEvidence(stream: self) }
+
+    init(
+        index: Int,
+        codecName: String?,
+        codecLongName: String?,
+        codecTagString: String?,
+        profile: String?,
+        codecType: String,
+        width: Int?,
+        height: Int?,
+        pixelFormat: String?,
+        colorRange: String?,
+        colorSpace: String?,
+        colorTransfer: String?,
+        colorPrimaries: String?,
+        averageFrameRate: String?,
+        numberOfFrames: String? = nil,
+        channels: Int?,
+        channelLayout: String?,
+        sampleRate: String?,
+        bitRate: String?,
+        tags: [String: String]?,
+        disposition: StreamDisposition?
+    ) {
+        self.index = index
+        self.codecName = codecName
+        self.codecLongName = codecLongName
+        self.codecTagString = codecTagString
+        self.profile = profile
+        self.codecType = codecType
+        self.width = width
+        self.height = height
+        self.pixelFormat = pixelFormat
+        self.colorRange = colorRange
+        self.colorSpace = colorSpace
+        self.colorTransfer = colorTransfer
+        self.colorPrimaries = colorPrimaries
+        self.averageFrameRate = averageFrameRate
+        self.numberOfFrames = numberOfFrames
+        self.channels = channels
+        self.channelLayout = channelLayout
+        self.sampleRate = sampleRate
+        self.bitRate = bitRate
+        self.tags = tags
+        self.disposition = disposition
+    }
 
     enum CodingKeys: String, CodingKey {
         case index, profile, width, height, channels, tags, disposition
@@ -48,6 +95,7 @@ struct MediaStream: Decodable, Identifiable, Sendable {
         case colorTransfer = "color_transfer"
         case colorPrimaries = "color_primaries"
         case averageFrameRate = "avg_frame_rate"
+        case numberOfFrames = "nb_frames"
         case channelLayout = "channel_layout"
         case sampleRate = "sample_rate"
         case bitRate = "bit_rate"

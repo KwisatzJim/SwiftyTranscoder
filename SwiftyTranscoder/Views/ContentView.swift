@@ -822,6 +822,7 @@ struct ContentView: View {
                 sourceBytes: size,
                 durationSeconds: duration,
                 frameRate: plan.frameRate,
+                exactFrameCount: inspection.videoStreams.first?.numberOfFrames.flatMap(Int64.init),
                 plan: plan
               ) else {
             return "AI restoration requires valid source duration and size metadata."
