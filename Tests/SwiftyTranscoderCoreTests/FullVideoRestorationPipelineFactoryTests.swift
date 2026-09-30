@@ -3,6 +3,15 @@ import Testing
 @testable import SwiftyTranscoderCore
 
 struct FullVideoRestorationPipelineFactoryTests {
+    @Test func rejectsHelperWithoutSegmentJoinCapability() throws {
+        let fixture = try RestorationResourceFixture(includeFFmpeg: true, includeFFprobe: true)
+        defer { fixture.remove() }
+
+        #expect(!FullVideoRestorationPipelineFactory.supportsConcatDemuxer(
+            at: fixture.ffmpegURL
+        ))
+    }
+
     @Test func locatesOnlyApprovedBundledResources() throws {
         let fixture = try RestorationResourceFixture(includeFFmpeg: true, includeFFprobe: true)
         defer { fixture.remove() }

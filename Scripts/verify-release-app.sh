@@ -84,6 +84,7 @@ done
 "$ffmpeg_path" -hide_banner -encoders | grep -q ' png '
 "$ffmpeg_path" -hide_banner -decoders | grep -q ' png '
 "$ffmpeg_path" -hide_banner -formats | grep -q ' image2 '
+"$ffmpeg_path" -hide_banner -demuxers | grep -q ' concat '
 
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app_path/Contents/Info.plist")"
 build_number="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app_path/Contents/Info.plist")"

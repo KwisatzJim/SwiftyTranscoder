@@ -99,6 +99,9 @@ struct FullVideoRestorationPipelineFactory: FullVideoRestorationPipelineBuilding
     func makePipeline(
         for request: FullVideoRestorationRequest
     ) throws -> any FullVideoRestorationPipelineRunning {
+        guard Self.supportsConcatDemuxer(at: resources.ffmpegURL) else {
+            throw FullVideoRestorationFactoryError.concatUnavailable
+        }
         let tileProcessor = try CoreMLRestorationTileProcessor(modelURL: resources.modelURL)
         let frameProcessor = RestorationFrameProcessor(tileProcessor: tileProcessor)
         let chunkProcessor = try FullRestorationChunkProcessor(
@@ -129,12 +132,36 @@ struct FullVideoRestorationPipelineFactory: FullVideoRestorationPipelineBuilding
             outputPromoter: RestorationOutputPromotionService()
         )
     }
+
+    static func supportsConcatDemuxer(at ffmpegURL: URL) -> Bool {
+        let process = Process()
+        let output = Pipe()
+        process.executableURL = ffmpegURL
+        process.arguments = ["-hide_banner", "-demuxers"]
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+        } catch {
+            return false
+        }
+        let text = String(
+            data: output.fileHandleForReading.readDataToEndOfFile(),
+            encoding: .utf8
+        ) ?? ""
+        process.waitUntilExit()
+        return process.terminationStatus == 0 && text.split(separator: "\n").contains { line in
+            let fields = line.split(whereSeparator: \.isWhitespace)
+            return fields.count >= 2 && fields[0] == "D" && fields[1] == "concat"
+        }
+    }
 }
 
 enum FullVideoRestorationFactoryError: LocalizedError, Equatable {
     case ffmpegUnavailable
     case ffprobeUnavailable
     case modelUnavailable
+    case concatUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -144,6 +171,8 @@ enum FullVideoRestorationFactoryError: LocalizedError, Equatable {
             "The bundled FFprobe helper required for full-video restoration is unavailable."
         case .modelUnavailable:
             "The bundled AI restoration model is unavailable. Rebuild SwiftyTranscoder after running Scripts/prepare-restoration-model.sh."
+        case .concatUnavailable:
+            "The FFmpeg helper cannot join restored video segments. Rebuild the bundled toolchain before starting full-video restoration."
         }
     }
 }

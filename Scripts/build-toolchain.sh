@@ -79,7 +79,7 @@ echo "Configuring the narrow FFmpeg toolchain…"
     --enable-zlib \
     --enable-libass \
     --enable-protocol=file,pipe \
-    --enable-demuxer=matroska,mov,image2 \
+    --enable-demuxer=matroska,mov,image2,concat \
     --enable-muxer=mp4,image2 \
     --enable-decoder=h264,hevc,mjpeg,png,aac,ac3,eac3,dca,truehd,flac,mp3,opus,vorbis,alac,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,subrip,pgssub \
     --enable-encoder=hevc_videotoolbox,png,ac3,aac \
@@ -107,6 +107,7 @@ test -x "$ffprobe_bin"
 "$ffmpeg_bin" -hide_banner -encoders | grep -q ' png '
 "$ffmpeg_bin" -hide_banner -decoders | grep -q ' png '
 "$ffmpeg_bin" -hide_banner -formats | grep -q ' image2 '
+"$ffmpeg_bin" -hide_banner -demuxers | grep -q ' concat '
 "$ffmpeg_bin" -hide_banner -decoders | grep -q ' pgssub '
 "$ffmpeg_bin" -hide_banner -filters | grep -q ' subtitles '
 "$ffmpeg_bin" -hide_banner -filters | grep -q ' alimiter '

@@ -46,6 +46,70 @@ struct RestorationSegmentConcatenatorTests {
         #expect(fixture.segmentURLs.allSatisfy { FileManager.default.fileExists(atPath: $0.path) })
     }
 
+    @Test func joinsRealHEVCSegmentsWithStagedHelperWhenAvailable() async throws {
+        let projectURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        let referenceDirectory = projectURL.appendingPathComponent(
+            ".build/restoration-evaluation/comparisons/Alphas - s01e11 - Original Sin"
+        )
+        let referenceURLs = (1...4).map {
+            referenceDirectory.appendingPathComponent(
+                String(format: "frame-%02d-real-esrgan.png", $0)
+            )
+        }
+        let toolDirectory = projectURL.appendingPathComponent(".build/toolchain/stage/bin")
+        let ffmpeg = toolDirectory.appendingPathComponent("ffmpeg")
+        let ffprobe = toolDirectory.appendingPathComponent("ffprobe")
+        guard referenceURLs.allSatisfy({ FileManager.default.fileExists(atPath: $0.path) }),
+              FileManager.default.isExecutableFile(atPath: ffmpeg.path),
+              FileManager.default.isExecutableFile(atPath: ffprobe.path) else { return }
+
+        let workspaceURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "SwiftyTranscoder-Restoration-RealConcat-\(UUID().uuidString)"
+        )
+        defer { try? FileManager.default.removeItem(at: workspaceURL) }
+        let segmentDirectory = workspaceURL.appendingPathComponent("segments")
+        try FileManager.default.createDirectory(at: segmentDirectory, withIntermediateDirectories: true)
+
+        var segmentURLs: [URL] = []
+        for index in 1...2 {
+            let chunkURL = workspaceURL.appendingPathComponent("chunk-\(index)")
+            let framesURL = chunkURL.appendingPathComponent("restored-frames")
+            try FileManager.default.createDirectory(at: framesURL, withIntermediateDirectories: true)
+            let frameURLs = try zip(1...4, referenceURLs).map { number, referenceURL in
+                let target = framesURL.appendingPathComponent(
+                    String(format: "frame-%08d.png", number)
+                )
+                try FileManager.default.copyItem(at: referenceURL, to: target)
+                return target
+            }
+            let assembly = try RestorationVideoAssembly(
+                frameURLs: frameURLs,
+                workspaceURL: chunkURL,
+                plan: Self.realPlan
+            )
+            let encodedURL = try await RestorationVideoAssembler(
+                ffmpegURL: ffmpeg, ffprobeURL: ffprobe
+            ).assemble(assembly)
+            let segmentURL = segmentDirectory.appendingPathComponent(
+                String(format: "segment-%06d.partial.mp4", index)
+            )
+            try FileManager.default.moveItem(at: encodedURL, to: segmentURL)
+            segmentURLs.append(segmentURL)
+        }
+
+        let request = try RestorationSegmentConcatenation(
+            segmentURLs: segmentURLs,
+            workspaceURL: workspaceURL,
+            plan: Self.realPlan,
+            totalFrameCount: 8
+        )
+        let output = try await RestorationSegmentConcatenator(
+            ffmpegURL: ffmpeg, ffprobeURL: ffprobe
+        ).concatenate(request)
+        #expect(FileManager.default.fileExists(atPath: output.path))
+        #expect(!FileManager.default.fileExists(atPath: request.manifestURL.path))
+    }
+
     @Test func cancellationKeepsOnlyClearlyLabeledPartialVideo() async throws {
         let fixture = try SegmentFixture(segmentCount: 2)
         defer { fixture.remove() }
@@ -66,6 +130,19 @@ struct RestorationSegmentConcatenatorTests {
         #expect(FileManager.default.fileExists(atPath: fixture.request.outputURL.path))
         #expect(!FileManager.default.fileExists(atPath: fixture.request.manifestURL.path))
     }
+
+    private static let realPlan = RestorationPlan(
+        method: .realESRGANX2Plus,
+        sourceWidth: 624,
+        sourceHeight: 352,
+        outputWidth: 1248,
+        outputHeight: 704,
+        frameRate: "24000/1001",
+        colorRange: "tv",
+        colorSpace: "smpte170m",
+        colorTransfer: "bt709",
+        colorPrimaries: "smpte170m"
+    )
 }
 
 private struct SegmentFixture {
