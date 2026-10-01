@@ -131,6 +131,8 @@ Restoration performance measurements and the Debug versus Release comparison are
 
 `Documentation/Milestone-93.md` records consecutive-frame profiling that explains the confirmed episode runtime and identifies AI model processing as the main remaining cost.
 
+`Documentation/Milestone-94.md` records a research-only SD frame model that processed three short comparison scenes about 2.25× faster. It awaits picture and motion review before application integration.
+
 ## Plex validation
 
 Representative outputs have been tested through Plex:
