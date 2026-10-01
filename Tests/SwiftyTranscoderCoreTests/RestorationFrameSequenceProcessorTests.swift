@@ -86,11 +86,21 @@ struct RestorationFrameSequenceProcessorTests {
             expectedWidth: 624,
             expectedHeight: 352
         )
+        let setupStarted = ProcessInfo.processInfo.systemUptime
         let tiles = try CoreMLRestorationTileProcessor(modelURL: modelURL)
         let frames = RestorationFrameProcessor(tileProcessor: tiles)
         let processor = RestorationFrameSequenceProcessor(frameProcessor: frames)
 
+        let setupSeconds = ProcessInfo.processInfo.systemUptime - setupStarted
+        let processingStarted = ProcessInfo.processInfo.systemUptime
         let outputs = try await processor.process(sequence)
+        let processingSeconds = ProcessInfo.processInfo.systemUptime - processingStarted
+        let timings = await frames.latestTimings
+        print(String(format:
+            "Restoration benchmark: setup %.3fs; four frames %.3fs; last frame decode %.3fs, tensor %.3fs, model %.3fs, blend %.3fs, output %.3fs",
+            setupSeconds, processingSeconds, timings.decoding, timings.tensorPreparation,
+            timings.inference, timings.blending, timings.output
+        ))
 
         #expect(outputs.count == 4)
         #expect(await processor.completedFrameCount == 4)

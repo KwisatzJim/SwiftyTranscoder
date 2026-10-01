@@ -63,10 +63,19 @@ protocol RestorationFrameProcessing: Sendable {
     func cancel() async
 }
 
+struct RestorationFrameTimings: Sendable {
+    var decoding = 0.0
+    var tensorPreparation = 0.0
+    var inference = 0.0
+    var blending = 0.0
+    var output = 0.0
+}
+
 actor RestorationFrameProcessor: RestorationFrameProcessing {
     private let tileProcessor: any RestorationTileProcessing
     private var cancellationRequested = false
     private(set) var progress = 0.0
+    private(set) var latestTimings = RestorationFrameTimings()
 
     init(tileProcessor: any RestorationTileProcessing) {
         self.tileProcessor = tileProcessor
@@ -91,7 +100,10 @@ actor RestorationFrameProcessor: RestorationFrameProcessing {
             throw RestorationFrameProcessorError.outputExists
         }
 
+        var timings = RestorationFrameTimings()
+        var started = ProcessInfo.processInfo.systemUptime
         let source = try Self.loadRGBA(sourceURL)
+        timings.decoding = ProcessInfo.processInfo.systemUptime - started
         guard source.width == expectedWidth, source.height == expectedHeight else {
             throw RestorationFrameProcessorError.unexpectedDimensions(
                 expectedWidth: expectedWidth,
@@ -113,14 +125,19 @@ actor RestorationFrameProcessor: RestorationFrameProcessing {
         for (yIndex, y) in geometry.yPositions.enumerated() {
             for (xIndex, x) in geometry.xPositions.enumerated() {
                 try checkCancellation()
+                started = ProcessInfo.processInfo.systemUptime
                 let input = try Self.makeInputTensor(
                     source: source,
                     geometry: geometry,
                     tileX: x,
                     tileY: y
                 )
+                timings.tensorPreparation += ProcessInfo.processInfo.systemUptime - started
+                started = ProcessInfo.processInfo.systemUptime
                 let restored = try await tileProcessor.process(input)
+                timings.inference += ProcessInfo.processInfo.systemUptime - started
                 try checkCancellation()
+                started = ProcessInfo.processInfo.systemUptime
                 Self.accumulate(
                     restored.values,
                     into: &accumulated,
@@ -133,11 +150,13 @@ actor RestorationFrameProcessor: RestorationFrameProcessing {
                     xPositions: geometry.xPositions,
                     yPositions: geometry.yPositions
                 )
+                timings.blending += ProcessInfo.processInfo.systemUptime - started
                 completedTiles += 1
                 progress = Double(completedTiles) / Double(geometry.tileCount)
             }
         }
 
+        started = ProcessInfo.processInfo.systemUptime
         let output = try Self.makeOutputRGBA(
             accumulated: accumulated,
             counts: counts,
@@ -145,6 +164,8 @@ actor RestorationFrameProcessor: RestorationFrameProcessing {
             geometry: geometry
         )
         try Self.writePNG(output, width: geometry.outputWidth, height: geometry.outputHeight, to: outputURL)
+        timings.output = ProcessInfo.processInfo.systemUptime - started
+        latestTimings = timings
         return outputURL
     }
 
