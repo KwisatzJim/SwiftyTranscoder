@@ -129,6 +129,8 @@ Post-1.0 restoration work begins with the safety and architecture boundary in `D
 
 Restoration performance measurements and the Debug versus Release comparison are recorded in `Documentation/Milestone-92.md`. Use an optimized Release build for practical full-video restoration runs.
 
+`Documentation/Milestone-93.md` records consecutive-frame profiling that explains the confirmed episode runtime and identifies AI model processing as the main remaining cost.
+
 ## Plex validation
 
 Representative outputs have been tested through Plex:
