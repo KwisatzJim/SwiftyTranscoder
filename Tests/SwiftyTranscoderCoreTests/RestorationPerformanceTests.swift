@@ -35,7 +35,13 @@ struct RestorationPerformanceTests {
             modelURL: model, computeUnits: useGPU ? .cpuAndGPU : .all
         )
         print("Restoration benchmark compute units: \(useGPU ? "CPU and GPU" : "all")")
-        let processor = RestorationFrameProcessor(tileProcessor: tileProcessor)
+        let useSD = ProcessInfo.processInfo.environment["SWIFTY_RESTORATION_SD"] == "1"
+        let sd = try useSD ? CoreMLRestorationTileProcessor(
+            modelURL: root.appendingPathComponent(".build/restoration-evaluation/sd-shape-experiment/RealESRGAN_x2plus_656x384_fp16.mlpackage"),
+            layout: .sdFrame
+        ) : nil
+        print("Restoration benchmark SD frame model: \(useSD)")
+        let processor = RestorationFrameProcessor(tileProcessor: tileProcessor, sdFrameProcessor: sd)
         let setupSeconds = clock() - started
         let outputsDirectory = workspace.appendingPathComponent("restored-frames")
         try FileManager.default.createDirectory(at: outputsDirectory, withIntermediateDirectories: false)

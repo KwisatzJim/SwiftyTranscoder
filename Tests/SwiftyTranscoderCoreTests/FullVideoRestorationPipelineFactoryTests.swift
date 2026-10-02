@@ -19,6 +19,7 @@ struct FullVideoRestorationPipelineFactoryTests {
         let resources = try FullVideoRestorationResources.locate(
             bundleURL: fixture.bundleURL,
             developmentModelURL: nil,
+            developmentSDModelURL: nil,
             ffmpegFallbackPaths: [],
             ffprobeFallbackPaths: []
         )
@@ -26,6 +27,7 @@ struct FullVideoRestorationPipelineFactoryTests {
         #expect(resources.ffmpegURL == fixture.ffmpegURL)
         #expect(resources.ffprobeURL == fixture.ffprobeURL)
         #expect(resources.modelURL == fixture.modelURL)
+        #expect(resources.sdModelURL == nil)
     }
 
     @Test func refusesMissingFFmpegBeforeConstructingPipeline() throws {
@@ -195,7 +197,10 @@ struct FullVideoRestorationPipelineFactoryTests {
             ffprobeURL: ffprobe,
             modelURL: modelURL
         )
-        let pipeline = try FullVideoRestorationPipelineFactory(resources: resources)
+        var selectedResources = resources
+        let sdModel = projectURL.appendingPathComponent(".build/restoration-evaluation/sd-shape-experiment/RealESRGAN_x2plus_656x384_fp16.mlpackage")
+        if FileManager.default.fileExists(atPath: sdModel.path) { selectedResources.sdModelURL = sdModel }
+        let pipeline = try FullVideoRestorationPipelineFactory(resources: selectedResources)
             .makePipeline(for: request)
 
         let result = await pipeline.run(request)

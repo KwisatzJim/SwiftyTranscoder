@@ -4,6 +4,18 @@ import Testing
 @testable import SwiftyTranscoderCore
 
 struct CoreMLRestorationTileProcessorTests {
+    @Test func acceptsOnlyExplicitSDFrameContract() throws {
+        _ = try RestorationModelContract(
+            input: feature("input", shape: [1, 3, 384, 656]),
+            output: feature("output", shape: [1, 3, 768, 1312]), layout: .sdFrame
+        )
+        #expect(throws: CoreMLRestorationError.invalidInputShape(actual: [1, 3, 384, 656])) {
+            try RestorationModelContract(
+                input: feature("input", shape: [1, 3, 384, 656]),
+                output: feature("output", shape: [1, 3, 768, 1312])
+            )
+        }
+    }
     @Test func acceptsExactPinnedModelContract() throws {
         let contract = try RestorationModelContract(
             input: feature("input", shape: [1, 3, 522, 522]),

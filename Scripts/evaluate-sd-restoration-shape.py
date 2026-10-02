@@ -65,6 +65,18 @@ def prepare():
     )
     MODEL.parent.mkdir(parents=True, exist_ok=True)
     converted.save(str(MODEL))
+    # Core ML creates random package UUIDs; stabilize the manifest for build pins.
+    manifest_path = MODEL / "Manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    identifiers = {
+        "model.mlmodel": "5429D13D-AB33-4ED3-B0EC-C0EC50B782C5",
+        "weights": "525D3899-A2C5-46E7-98D2-66EB5060469D",
+    }
+    manifest["itemInfoEntries"] = {
+        identifiers[entry["name"]]: entry for entry in manifest["itemInfoEntries"].values()
+    }
+    manifest["rootModelIdentifier"] = identifiers["model.mlmodel"]
+    manifest_path.write_text(json.dumps(manifest, indent=4, sort_keys=True) + "\n")
     hashes = {str(p.relative_to(MODEL)): hashlib.sha256(p.read_bytes()).hexdigest()
               for p in sorted(MODEL.rglob("*")) if p.is_file()}
     (OUTPUT / "model-checksums.json").write_text(json.dumps(hashes, indent=2) + "\n")

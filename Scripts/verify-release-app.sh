@@ -14,6 +14,7 @@ notices_path="$app_path/Contents/Resources/ThirdPartyNotices"
 ffmpeg_path="$helpers_path/ffmpeg"
 ffprobe_path="$helpers_path/ffprobe"
 model_path="$app_path/Contents/Resources/Models/RealESRGAN_x2plus_522_fp16.mlpackage"
+sd_model_path="$app_path/Contents/Resources/Models/RealESRGAN_x2plus_656x384_fp16.mlpackage"
 
 if [[ ! -d "$app_path" || ! -x "$executable_path" ]]; then
     echo "SwiftyTranscoder application is incomplete: $app_path" >&2
@@ -58,6 +59,9 @@ verify_checksum "6f4af8152eba8589bee31c7fe341a5b35534f06330056606a6df09958939579
 verify_checksum "b79575977211ba89fb7856076e652fdd34f822b5228858e15b8d61169720e1ac" "$model_path/Data/com.apple.CoreML/model.mlmodel"
 verify_checksum "a8904f0bb627d5dbce2468a96c648764a63ece561cfcf118da6321831bb3a926" "$model_path/Data/com.apple.CoreML/weights/weight.bin"
 verify_checksum "4a699ec4863d96a91fc265948a0c90033f7e8735d515524dcf3444736406e0c2" "$notices_path/Real-ESRGAN-LICENSE.txt"
+verify_checksum "f7ab86b57d5bd1d2dc4b373e1ffbde5345cbc19059e85401d5f157873730eabf" "$sd_model_path/Manifest.json"
+verify_checksum "21fc2a660891b7435418c3cb9d57eabd920d0e3f57440bdc8632efe4c50a7fd8" "$sd_model_path/Data/com.apple.CoreML/model.mlmodel"
+verify_checksum "a8904f0bb627d5dbce2468a96c648764a63ece561cfcf118da6321831bb3a926" "$sd_model_path/Data/com.apple.CoreML/weights/weight.bin"
 
 architectures="$(lipo -archs "$executable_path")"
 if [[ "$architectures" != "arm64" ]]; then

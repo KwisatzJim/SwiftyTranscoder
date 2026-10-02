@@ -46,9 +46,8 @@ final class RestorationPreviewController: ObservableObject {
         let frameCount = min(240, max(1, Int((durationSeconds * frameRate).rounded())))
 
         do {
-            let modelURL = try FullVideoRestorationResources.locate().modelURL
-            let tiles = try CoreMLRestorationTileProcessor(modelURL: modelURL)
-            let frames = RestorationFrameProcessor(tileProcessor: tiles)
+            let resources = try FullVideoRestorationResources.locate()
+            let frames = try resources.makeFrameProcessor(for: plan)
             let extractor = try RestorationFrameExtractor()
             let assembler = try RestorationVideoAssembler()
             let audioMuxer = try RestorationAudioMuxer()

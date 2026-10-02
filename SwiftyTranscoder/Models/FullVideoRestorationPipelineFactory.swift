@@ -2,14 +2,17 @@ import Foundation
 
 struct FullVideoRestorationResources: Equatable, Sendable {
     static let modelName = "RealESRGAN_x2plus_522_fp16.mlpackage"
+    static let sdModelName = "RealESRGAN_x2plus_656x384_fp16.mlpackage"
 
     let ffmpegURL: URL
     let ffprobeURL: URL
     let modelURL: URL
+    var sdModelURL: URL? = nil
 
     static func locate(
         bundleURL: URL = Bundle.main.bundleURL,
         developmentModelURL: URL? = defaultDevelopmentModelURL,
+        developmentSDModelURL: URL? = defaultDevelopmentSDModelURL,
         ffmpegFallbackPaths: [String]? = nil,
         ffprobeFallbackPaths: [String]? = nil,
         fileManager: FileManager = .default
@@ -43,7 +46,26 @@ struct FullVideoRestorationResources: Equatable, Sendable {
             throw FullVideoRestorationFactoryError.modelUnavailable
         }
 
-        return Self(ffmpegURL: ffmpegURL, ffprobeURL: ffprobeURL, modelURL: modelURL)
+        let bundledSDModel = bundleURL.appendingPathComponent("Contents/Resources/Models")
+            .appendingPathComponent(sdModelName)
+        let sdModelURL = [bundledSDModel, developmentSDModelURL].compactMap { $0 }.first {
+            var isDirectory: ObjCBool = false
+            return fileManager.fileExists(atPath: $0.path, isDirectory: &isDirectory) && isDirectory.boolValue
+        }
+        return Self(ffmpegURL: ffmpegURL, ffprobeURL: ffprobeURL, modelURL: modelURL, sdModelURL: sdModelURL)
+    }
+
+    func makeFrameProcessor(for plan: RestorationPlan) throws -> RestorationFrameProcessor {
+        let tiles = try CoreMLRestorationTileProcessor(modelURL: modelURL)
+        let sd = try (plan.sourceWidth == 624 && plan.sourceHeight == 352 ? sdModelURL : nil).map {
+            try CoreMLRestorationTileProcessor(modelURL: $0, layout: .sdFrame)
+        }
+        return RestorationFrameProcessor(tileProcessor: tiles, sdFrameProcessor: sd)
+    }
+
+    private static var defaultDevelopmentSDModelURL: URL {
+        defaultDevelopmentModelURL.deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("sd-shape-experiment/\(sdModelName)")
     }
 
     private static var defaultDevelopmentModelURL: URL {
@@ -102,8 +124,7 @@ struct FullVideoRestorationPipelineFactory: FullVideoRestorationPipelineBuilding
         guard Self.supportsConcatDemuxer(at: resources.ffmpegURL) else {
             throw FullVideoRestorationFactoryError.concatUnavailable
         }
-        let tileProcessor = try CoreMLRestorationTileProcessor(modelURL: resources.modelURL)
-        let frameProcessor = RestorationFrameProcessor(tileProcessor: tileProcessor)
+        let frameProcessor = try resources.makeFrameProcessor(for: request.plan)
         let chunkProcessor = try FullRestorationChunkProcessor(
             sourceURL: request.sourceURL,
             workspaceURL: request.workspaceURL,

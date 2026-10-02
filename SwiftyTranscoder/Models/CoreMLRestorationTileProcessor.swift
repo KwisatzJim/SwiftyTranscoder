@@ -1,6 +1,18 @@
 import CoreML
 import Foundation
 
+enum RestorationModelLayout: Equatable, Sendable {
+    case tiled, sdFrame
+
+    var inputShape: [Int] {
+        self == .tiled ? [1, 3, 522, 522] : [1, 3, 384, 656]
+    }
+
+    var outputShape: [Int] {
+        [1, 3, inputShape[2] * 2, inputShape[3] * 2]
+    }
+}
+
 struct RestorationModelFeature: Equatable, Sendable {
     let name: String
     let shape: [Int]
@@ -14,11 +26,11 @@ struct RestorationModelContract: Equatable, Sendable {
     let input: RestorationModelFeature
     let output: RestorationModelFeature
 
-    init(input: RestorationModelFeature, output: RestorationModelFeature) throws {
-        guard input.shape == Self.expectedInputShape else {
+    init(input: RestorationModelFeature, output: RestorationModelFeature, layout: RestorationModelLayout = .tiled) throws {
+        guard input.shape == layout.inputShape else {
             throw CoreMLRestorationError.invalidInputShape(actual: input.shape)
         }
-        guard output.shape == Self.expectedOutputShape else {
+        guard output.shape == layout.outputShape else {
             throw CoreMLRestorationError.invalidOutputShape(actual: output.shape)
         }
         guard input.dataType == .float16, output.dataType == .float16 else {
@@ -28,7 +40,7 @@ struct RestorationModelContract: Equatable, Sendable {
         self.output = output
     }
 
-    static func inspect(_ description: MLModelDescription) throws -> Self {
+    static func inspect(_ description: MLModelDescription, layout: RestorationModelLayout = .tiled) throws -> Self {
         let inputs = try multiArrayFeatures(in: description.inputDescriptionsByName)
         let outputs = try multiArrayFeatures(in: description.outputDescriptionsByName)
         guard inputs.count == 1, outputs.count == 1 else {
@@ -37,7 +49,7 @@ struct RestorationModelContract: Equatable, Sendable {
                 outputs: outputs.count
             )
         }
-        return try Self(input: inputs[0], output: outputs[0])
+        return try Self(input: inputs[0], output: outputs[0], layout: layout)
     }
 
     private static func multiArrayFeatures(
@@ -76,7 +88,7 @@ actor CoreMLRestorationTileProcessor: RestorationTileProcessing {
     private let model: MLModel
     private var cancellationRequested = false
 
-    init(modelURL: URL, computeUnits: MLComputeUnits = .all) throws {
+    init(modelURL: URL, computeUnits: MLComputeUnits = .all, layout: RestorationModelLayout = .tiled) throws {
         guard FileManager.default.fileExists(atPath: modelURL.path(percentEncoded: false)) else {
             throw CoreMLRestorationError.modelMissing
         }
@@ -94,7 +106,7 @@ actor CoreMLRestorationTileProcessor: RestorationTileProcessing {
         configuration.computeUnits = computeUnits
         do {
             model = try MLModel(contentsOf: compiledURL, configuration: configuration)
-            contract = try RestorationModelContract.inspect(model.modelDescription)
+            contract = try RestorationModelContract.inspect(model.modelDescription, layout: layout)
         } catch let error as CoreMLRestorationError {
             throw error
         } catch {
@@ -105,7 +117,7 @@ actor CoreMLRestorationTileProcessor: RestorationTileProcessing {
     func process(_ input: RestorationTileTensor) throws -> RestorationTileTensor {
         cancellationRequested = false
         try checkCancellation()
-        guard input.values.shape.map(\.intValue) == RestorationModelContract.expectedInputShape,
+        guard input.values.shape.map(\.intValue) == contract.input.shape,
               input.values.dataType == contract.input.dataType else {
             throw CoreMLRestorationError.invalidInputTensor
         }

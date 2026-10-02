@@ -13,6 +13,9 @@ notices_destination="$app_contents/Resources/ThirdPartyNotices"
 model_name="RealESRGAN_x2plus_522_fp16.mlpackage"
 model_source="$project_root/.build/restoration-evaluation/converter/weights/$model_name"
 model_destination="$app_contents/Resources/Models/$model_name"
+sd_model_name="RealESRGAN_x2plus_656x384_fp16.mlpackage"
+sd_model_source="$project_root/.build/restoration-evaluation/sd-shape-experiment/$sd_model_name"
+sd_model_destination="$app_contents/Resources/Models/$sd_model_name"
 model_license_source="$project_root/.build/restoration-evaluation/licenses/Real-ESRGAN-LICENSE.txt"
 signing_identity="${EXPANDED_CODE_SIGN_IDENTITY:--}"
 
@@ -61,6 +64,9 @@ verify_checksum "6f4af8152eba8589bee31c7fe341a5b35534f06330056606a6df09958939579
 verify_checksum "b79575977211ba89fb7856076e652fdd34f822b5228858e15b8d61169720e1ac" "$model_source/Data/com.apple.CoreML/model.mlmodel"
 verify_checksum "a8904f0bb627d5dbce2468a96c648764a63ece561cfcf118da6321831bb3a926" "$model_source/Data/com.apple.CoreML/weights/weight.bin"
 verify_checksum "4a699ec4863d96a91fc265948a0c90033f7e8735d515524dcf3444736406e0c2" "$model_license_source"
+verify_checksum "f7ab86b57d5bd1d2dc4b373e1ffbde5345cbc19059e85401d5f157873730eabf" "$sd_model_source/Manifest.json"
+verify_checksum "21fc2a660891b7435418c3cb9d57eabd920d0e3f57440bdc8632efe4c50a7fd8" "$sd_model_source/Data/com.apple.CoreML/model.mlmodel"
+verify_checksum "a8904f0bb627d5dbce2468a96c648764a63ece561cfcf118da6321831bb3a926" "$sd_model_source/Data/com.apple.CoreML/weights/weight.bin"
 
 mkdir -p "$helpers_destination" "$notices_destination" "$(dirname "$model_destination")"
 
@@ -79,5 +85,6 @@ cp "$ffmpeg_licenses_source/COPYING.LGPLv2.1" "$notices_destination/FFmpeg-COPYI
 cp "$ffmpeg_licenses_source/LICENSE.md" "$notices_destination/FFmpeg-LICENSE.md"
 cp "$model_license_source" "$notices_destination/Real-ESRGAN-LICENSE.txt"
 ditto "$model_source" "$model_destination"
+ditto "$sd_model_source" "$sd_model_destination"
 
 echo "Embedded verified FFmpeg helpers, restoration model, and third-party notices."

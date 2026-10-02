@@ -136,6 +136,9 @@
 				"$(SRCROOT)/.build/restoration-evaluation/converter/weights/RealESRGAN_x2plus_522_fp16.mlpackage/Data/com.apple.CoreML/model.mlmodel",
 				"$(SRCROOT)/.build/restoration-evaluation/converter/weights/RealESRGAN_x2plus_522_fp16.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
 				"$(SRCROOT)/.build/restoration-evaluation/licenses/Real-ESRGAN-LICENSE.txt",
+				"$(SRCROOT)/.build/restoration-evaluation/sd-shape-experiment/RealESRGAN_x2plus_656x384_fp16.mlpackage/Manifest.json",
+				"$(SRCROOT)/.build/restoration-evaluation/sd-shape-experiment/RealESRGAN_x2plus_656x384_fp16.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+				"$(SRCROOT)/.build/restoration-evaluation/sd-shape-experiment/RealESRGAN_x2plus_656x384_fp16.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
 			);
 			name = "Embed Toolchain";
 			outputFileListPaths = (
@@ -153,6 +156,9 @@
 				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/Models/RealESRGAN_x2plus_522_fp16.mlpackage/Data/com.apple.CoreML/model.mlmodel",
 				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/Models/RealESRGAN_x2plus_522_fp16.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
 				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/ThirdPartyNotices/Real-ESRGAN-LICENSE.txt",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/Models/RealESRGAN_x2plus_656x384_fp16.mlpackage/Manifest.json",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/Models/RealESRGAN_x2plus_656x384_fp16.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/Models/RealESRGAN_x2plus_656x384_fp16.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;

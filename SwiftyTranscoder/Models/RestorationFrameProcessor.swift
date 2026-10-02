@@ -73,12 +73,14 @@ struct RestorationFrameTimings: Sendable {
 
 actor RestorationFrameProcessor: RestorationFrameProcessing {
     private let tileProcessor: any RestorationTileProcessing
+    private let sdFrameProcessor: (any RestorationTileProcessing)?
     private var cancellationRequested = false
     private(set) var progress = 0.0
     private(set) var latestTimings = RestorationFrameTimings()
 
-    init(tileProcessor: any RestorationTileProcessing) {
+    init(tileProcessor: any RestorationTileProcessing, sdFrameProcessor: (any RestorationTileProcessing)? = nil) {
         self.tileProcessor = tileProcessor
+        self.sdFrameProcessor = sdFrameProcessor
     }
 
     func process(
@@ -111,6 +113,9 @@ actor RestorationFrameProcessor: RestorationFrameProcessing {
                 actualWidth: source.width,
                 actualHeight: source.height
             )
+        }
+        if source.width == 624, source.height == 352, let sdFrameProcessor {
+            return try await processSDFrame(source, outputURL: outputURL, processor: sdFrameProcessor, timings: timings)
         }
         let geometry = try RestorationFrameGeometry(width: source.width, height: source.height)
         let accumulatedWidth = geometry.paddedWidth * RestorationFrameGeometry.scale
@@ -172,6 +177,62 @@ actor RestorationFrameProcessor: RestorationFrameProcessing {
     func cancel() async {
         cancellationRequested = true
         await tileProcessor.cancel()
+        await sdFrameProcessor?.cancel()
+    }
+
+    private func processSDFrame(
+        _ source: RGBAImage, outputURL: URL,
+        processor: any RestorationTileProcessing, timings initialTimings: RestorationFrameTimings
+    ) async throws -> URL {
+        var timings = initialTimings
+        var started = ProcessInfo.processInfo.systemUptime
+        let shape = RestorationModelLayout.sdFrame.inputShape
+        let input = try MLMultiArray(shape: shape.map(NSNumber.init), dataType: .float16)
+        let inputPointer = input.dataPointer.bindMemory(to: Float16.self, capacity: input.count)
+        let inputStrides = input.strides.map(\.intValue)
+        for y in 0..<shape[2] {
+            try checkCancellation()
+            let sourceY = RestorationFrameGeometry.reflectedIndex(y - 16, length: source.height)
+            for x in 0..<shape[3] {
+                let sourceX = RestorationFrameGeometry.reflectedIndex(x - 16, length: source.width)
+                let offset = (sourceY * source.width + sourceX) * 4
+                for channel in 0..<3 {
+                    inputPointer[channel * inputStrides[1] + y * inputStrides[2] + x * inputStrides[3]] =
+                        Float16(Float(source.bytes[offset + channel]) / 255)
+                }
+            }
+        }
+        timings.tensorPreparation = ProcessInfo.processInfo.systemUptime - started
+        started = ProcessInfo.processInfo.systemUptime
+        let restored = try await processor.process(RestorationTileTensor(values: input))
+        try checkCancellation()
+        guard restored.values.shape.map(\.intValue) == RestorationModelLayout.sdFrame.outputShape,
+              restored.values.dataType == .float16 else {
+            throw CoreMLRestorationError.invalidOutputTensor
+        }
+        timings.inference = ProcessInfo.processInfo.systemUptime - started
+        started = ProcessInfo.processInfo.systemUptime
+        let outputWidth = source.width * 2
+        let outputHeight = source.height * 2
+        var bytes = [UInt8](repeating: 255, count: outputWidth * outputHeight * 4)
+        let values = restored.values.dataPointer.bindMemory(to: Float16.self, capacity: restored.values.count)
+        let strides = restored.values.strides.map(\.intValue)
+        for y in 0..<outputHeight {
+            try checkCancellation()
+            for x in 0..<outputWidth {
+                for channel in 0..<3 {
+                    let value = Float(values[channel * strides[1] + (y + 32) * strides[2] + (x + 32) * strides[3]])
+                    guard value.isFinite else { throw CoreMLRestorationError.nonFiniteOutput }
+                    bytes[(y * outputWidth + x) * 4 + channel] =
+                        UInt8(clamping: Int((min(max(value, 0), 1) * 255).rounded()))
+                }
+            }
+        }
+        try Self.writePNG(bytes, width: outputWidth, height: outputHeight, to: outputURL)
+        timings.output = ProcessInfo.processInfo.systemUptime - started
+        latestTimings = timings
+        progress = 1
+        return outputURL
     }
 
     private func checkCancellation() throws {

@@ -104,3 +104,10 @@ echo
 echo "Restoration candidate preparation: PASS"
 echo "Research model: $MODEL_PATH"
 echo "The prepared model remains ignored; verified application builds embed it as a resource."
+SD_MODEL="$WORK_DIR/sd-shape-experiment/RealESRGAN_x2plus_656x384_fp16.mlpackage"
+if [[ ! -d "$SD_MODEL" ]]; then
+    "$VENV_DIR/bin/python" "$SCRIPT_DIR/evaluate-sd-restoration-shape.py" prepare
+fi
+verify_checksum "f7ab86b57d5bd1d2dc4b373e1ffbde5345cbc19059e85401d5f157873730eabf" "$SD_MODEL/Manifest.json"
+verify_checksum "21fc2a660891b7435418c3cb9d57eabd920d0e3f57440bdc8632efe4c50a7fd8" "$SD_MODEL/Data/com.apple.CoreML/model.mlmodel"
+verify_checksum "a8904f0bb627d5dbce2468a96c648764a63ece561cfcf118da6321831bb3a926" "$SD_MODEL/Data/com.apple.CoreML/weights/weight.bin"
