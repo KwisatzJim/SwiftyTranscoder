@@ -129,7 +129,12 @@ fi
 cp "$temporary_dmg" "$dmg_path"
 
 checksum_line="$(shasum -a 256 "$dmg_path" | awk -v name="$dmg_name" '{ print $1 "  " name }')"
-printf '%s\n' "$checksum_line" > "$checksum_path.tmp"
+if [[ -f "$checksum_path" ]]; then
+    awk -v name="$dmg_name" '$2 != name' "$checksum_path" > "$checksum_path.tmp"
+else
+    : > "$checksum_path.tmp"
+fi
+printf '%s\n' "$checksum_line" >> "$checksum_path.tmp"
 mv -f "$checksum_path.tmp" "$checksum_path"
 
 echo ""
