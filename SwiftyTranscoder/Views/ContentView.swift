@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -23,6 +24,7 @@ struct ContentView: View {
     @State private var wizardStep = WizardStep.choose
     @State private var technicalDetailsExpanded = false
     @State private var isChoosingSource = false
+    @State private var isDropTargeted = false
     @State private var sourceQueue: [URL] = []
     @State private var currentQueueIndex = 0
     @State private var approvedPlans: [Int: ApprovedConversion] = [:]
@@ -44,6 +46,7 @@ struct ContentView: View {
     @State private var restorationEnabled = false
     @AppStorage("savedOutputFolderPath") private var savedOutputFolderPath = ""
     @AppStorage("defaultGainEnabled") private var defaultGainEnabled = true
+    @AppStorage("defaultAACStereoEnabled") private var defaultAACStereoEnabled = false
     @AppStorage("defaultSubtitleMode") private var defaultSubtitleMode = "recommended"
     @AppStorage("batchNotificationsEnabled") private var batchNotificationsEnabled = false
 
@@ -193,9 +196,45 @@ struct ContentView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
+
+                Button("Choose Folder…", systemImage: "folder.badge.plus") {
+                    chooseSourceFolder()
+                }
             }
+            Text("Folder selection loads MKV, MP4, and M4V files directly inside the folder, in filename order. Subfolders are not included. A new selection replaces the current queue.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 560)
         }
         .padding(.vertical, 28)
+        .frame(maxWidth: .infinity)
+        .background(isDropTargeted ? Color.accentColor.opacity(0.08) : Color.clear)
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(isDropTargeted ? Color.accentColor : Color.secondary.opacity(0.3), style: StrokeStyle(lineWidth: 2, dash: [6]))
+        }
+        .overlay(alignment: .bottom) {
+            Text("Drop videos or folders here")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(6)
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            guard !isBatchRunning, !isInspecting, !isRestorationPreviewActive else { return false }
+            do {
+                let videos = try SourceFolderImport.videos(fromDroppedURLs: urls)
+                guard !videos.isEmpty else {
+                    selectionError = "No supported MKV, MP4, or M4V files were found in this drop. Subfolders and symbolic links are excluded."
+                    return false
+                }
+                handleSelection(.success(videos))
+                return true
+            } catch {
+                selectionError = "Could not read the dropped selection: \(error.localizedDescription)"
+                return false
+            }
+        } isTargeted: { isDropTargeted = $0 }
     }
 
     private var returnToSelectionTitle: String {
@@ -657,6 +696,25 @@ struct ContentView: View {
         }
     }
 
+    private func chooseSourceFolder() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose a folder of videos"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let folder = panel.url else { return }
+        do {
+            let videos = try SourceFolderImport.videos(in: folder)
+            guard !videos.isEmpty else {
+                selectionError = "This folder contains no supported MKV, MP4, or M4V video files. Subfolders are not included."
+                return
+            }
+            handleSelection(.success(videos))
+        } catch {
+            selectionError = "Could not read the selected folder: \(error.localizedDescription)"
+        }
+    }
+
     private var startButtonTitle: String {
         guard sourceQueue.count > 1 else { return "Convert Approved Plan" }
         if isBatchReady { return "Start Approved Batch" }
@@ -725,7 +783,7 @@ struct ContentView: View {
         selectedSource = source
         inspection = nil
         gainEnabled = defaultGainEnabled
-        aacStereoEnabled = false
+        aacStereoEnabled = defaultAACStereoEnabled
         colorSelection = .needsConfirmation
         subtitleSelection = .needsChoice
         outputURL = nil
@@ -780,6 +838,7 @@ struct ContentView: View {
 
     private func saveCurrentDefaults() {
         defaultGainEnabled = gainEnabled
+        defaultAACStereoEnabled = aacStereoEnabled
         defaultSubtitleMode = subtitleSelection == .omit ? "omit" : "recommended"
     }
 

@@ -108,7 +108,7 @@ struct ConversionPlanView: View {
 
                 Divider()
                 HStack {
-                    Button("Save Gain & Subtitle Defaults", systemImage: "square.and.arrow.down") {
+                    Button("Save Conversion Defaults", systemImage: "square.and.arrow.down") {
                         saveDefaults()
                         defaultsSaved = true
                     }
@@ -118,7 +118,7 @@ struct ConversionPlanView: View {
                             .foregroundStyle(.green)
                     }
                 }
-                Text("Future sources will reuse the gain setting and either automatic subtitle recommendations or Omit subtitles. Specific tracks and color confirmations are never reused.")
+                Text("Future sources will reuse the gain and AAC stereo settings, and either automatic subtitle recommendations or Omit subtitles. Specific tracks and color confirmations are never reused.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -138,6 +138,7 @@ struct ConversionPlanView: View {
         }
         .frame(maxWidth: 760)
         .onChange(of: gainEnabled) { _, _ in defaultsSaved = false }
+        .onChange(of: aacStereoEnabled) { _, _ in defaultsSaved = false }
         .onChange(of: subtitleSelection) { _, _ in defaultsSaved = false }
     }
 

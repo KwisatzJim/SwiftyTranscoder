@@ -24,6 +24,7 @@ The source MKV is always read-only. Conversion is written to a clearly named `.p
 - Remove an unwanted source from a batch before encoding without deleting its file or discarding the other approved plans.
 - Refuse to overwrite existing output, verify aggregate destination free space, and block duplicate output paths before a batch starts.
 - Validate video profile, pixel format, color metadata, dimensions, frame rate, audio format, channel layout, bitrate, duration, and subtitle policy before completing a file.
+- Development builds for 1.1 offer optional local Real-ESRGAN restoration for one eligible 8-bit SDR source at a time, with short previews, bounded temporary storage, and validated audio/subtitle integration. Restoration stays off by default; 624×352 sources use the reviewed faster model.
 
 ## Requirements
 
@@ -94,7 +95,9 @@ Before a reviewed batch can start, SwiftyTranscoder adds the conservative requir
 
 Multi-file queues can optionally send a macOS notification when the batch completes, fails, or is cancelled. This is off by default and requires SwiftyTranscoder to be allowed in **System Settings → Notifications**.
 
-The conversion plan can remember gain and subtitle-policy defaults across sources and app launches. Specific subtitle stream numbers and color confirmations are always source-specific and are never reused.
+The conversion plan can remember gain, optional AAC stereo compatibility audio, and subtitle-policy defaults across sources and app launches. Use **Save Conversion Defaults** after choosing these settings. Specific subtitle stream numbers and color confirmations are always source-specific and are never reused.
+
+Use **Choose Folder…** to load the MKV, MP4, and M4V files directly inside a folder in filename order. Hidden files, symbolic links, and subfolders are excluded. You can also drag videos or folders from Finder onto the Choose screen; mixed drops skip duplicate paths and unsupported files. A new selection replaces the current queue; all plans still require review before conversion.
 
 ## Supported version-1 path
 
@@ -119,7 +122,7 @@ The conversion plan can remember gain and subtitle-policy defaults across source
 - Selectable MP4 subtitle output is not implemented; supported subtitles are either burned in or omitted.
 - MP4/M4V audio-only processing cannot burn subtitles because that would require video re-encoding.
 - Every queued plan must be reviewed and approved before unattended batch conversion begins. A failure or cancellation stops the batch.
-- Automatic crop detection and broad encoder controls remain deferred. Optional restoration and AI upscaling are being developed for the 1.1 line and are not present in 1.0.
+- Automatic crop detection and broad encoder controls remain deferred. Optional restoration and AI upscaling are available in development builds for the 1.1 line, not in the packaged 1.0 release. Batch restoration is not supported; ordinary batch conversion remains available.
 - Likely-forced analysis depends on trustworthy Matroska subtitle statistics. Missing, malformed, lone, or ambiguous statistical evidence produces no recommendation.
 - The current personal release is arm64 and ad-hoc signed; it is not a Developer ID signed or notarized public distribution.
 
