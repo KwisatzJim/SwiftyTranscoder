@@ -87,9 +87,9 @@ swift test
 
 ## Local releases
 
-The personal arm64 `1.4.0 (14)` release adds restoration completion statistics, a remembered AI model preference, and explicit `--restore lightweight` CLI restoration with dry-run planning, progress, cancellation, and validated output. These features passed their focused user checkpoints. Its artifact is `dist/SwiftyTranscoder_1.4.0_arm64.dmg`; earlier releases remain available.
-
 The personal arm64 `1.5.0 (15)` release adds accepted opt-in single-video resume and CLI saved jobs. Completed blocks survive interruption and are verified before reuse; resumed elapsed time, speed, and remaining-time estimates count new work appropriately. Its artifact is `dist/SwiftyTranscoder_1.5.0_arm64.dmg`. The existing CLI launcher uses the updated app after installation.
+
+The personal arm64 `1.4.0 (14)` release adds restoration completion statistics, a remembered AI model preference, and explicit `--restore lightweight` CLI restoration with dry-run planning, progress, cancellation, and validated output. These features passed their focused user checkpoints. Its artifact is `dist/SwiftyTranscoder_1.4.0_arm64.dmg`; earlier releases remain available.
 
 The personal arm64 `1.3.0 (13)` release adds reviewed restoration batches, numeric progress and current-video time estimates, selectable Lightweight FSRCNN and Compact Real-ESRGAN models, corrected capped-HD assembly, and faster lossless temporary PNG writing. The user accepted a full Pilot run (107 minutes) and a two-file Original Sin batch (50 minutes), including playback. These observations apply to the tested sources on the M6 Mac mini. All four model resources and their licenses are bundled and checksum verified. Its artifact is `dist/SwiftyTranscoder_1.3.0_arm64.dmg`; older installers remain available.
 
