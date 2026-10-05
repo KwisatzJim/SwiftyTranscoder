@@ -135,9 +135,12 @@ struct RestorationAudioMux: Sendable {
                 "-disposition:a:1", "0",
             ]
         }
+        // Preview output may stop at the shorter stream. Full restoration must
+        // preserve every restored frame even if audio ends a few milliseconds early.
+        if scope == .preview { arguments += ["-shortest"] }
         arguments += [
             "-map_metadata", "1", "-map_chapters", scope == .fullDuration ? "1" : "-1",
-            "-shortest", "-avoid_negative_ts", "make_zero",
+            "-avoid_negative_ts", "make_zero",
             "-movflags", "+faststart", "-progress", "pipe:1", "-nostats",
             outputURL.path(percentEncoded: false),
         ]

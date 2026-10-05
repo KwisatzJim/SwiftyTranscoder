@@ -3,6 +3,26 @@ import Testing
 @testable import SwiftyTranscoderCore
 
 struct RestorationVideoAssemblerTests {
+    @Test func resizes720pRestorationToApproved1080pBeforeSubtitleBurn() throws {
+        let fixture = try VideoAssemblerFixture(frameCount: 2)
+        defer { fixture.remove() }
+        let plan = RestorationPlan(
+            method: .realESRGANX2Plus, sourceWidth: 1280, sourceHeight: 720,
+            outputWidth: 1920, outputHeight: 1080, frameRate: "24000/1001",
+            colorRange: "tv", colorSpace: "bt709", colorTransfer: "bt709", colorPrimaries: "bt709"
+        )
+        let assembly = try RestorationVideoAssembly(
+            frameURLs: fixture.frameURLs, workspaceURL: fixture.workspaceURL, plan: plan,
+            subtitleBurn: RestorationSubtitleBurn(
+                sourceURL: fixture.rootURL.appendingPathComponent("source.mkv"),
+                subtitleStreamOrdinal: 0, chunkStartSeconds: 0
+            )
+        )
+        let arguments = assembly.ffmpegArguments
+        let filterIndex = try #require(arguments.firstIndex(of: "-vf"))
+        #expect(arguments[filterIndex + 1].hasPrefix("scale=1920:1080:flags=lanczos,setpts="))
+    }
+
     @Test func buildsHardwareOnlySilentHEVCCommand() throws {
         let fixture = try VideoAssemblerFixture(frameCount: 4)
         defer { fixture.remove() }

@@ -2,6 +2,8 @@ import Foundation
 
 enum RestorationMethod: String, Equatable, Sendable {
     case realESRGANX2Plus = "Real-ESRGAN x2plus"
+    case lightweightFSRCNN = "Lightweight FSRCNN (experimental)"
+    case compactGeneral = "Compact Real-ESRGAN (experimental)"
 }
 
 struct RestorationPlan: Equatable, Sendable {
@@ -31,7 +33,7 @@ struct RestorationPlanner: Sendable {
     private let maximumWidth = 1_920
     private let maximumHeight = 1_080
 
-    func plan(for inspection: MediaInspection) -> RestorationEligibility {
+    func plan(for inspection: MediaInspection, method: RestorationMethod = .realESRGANX2Plus) -> RestorationEligibility {
         guard inspection.videoStreams.count == 1, let video = inspection.videoStreams.first else {
             return .unavailable("AI restoration requires exactly one video stream.")
         }
@@ -60,7 +62,7 @@ struct RestorationPlanner: Sendable {
 
         let dimensions = outputDimensions(width: width, height: height)
         return .eligible(RestorationPlan(
-            method: .realESRGANX2Plus,
+            method: method,
             sourceWidth: width,
             sourceHeight: height,
             outputWidth: dimensions.width,

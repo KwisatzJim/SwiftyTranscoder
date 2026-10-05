@@ -15,6 +15,14 @@ final class FullVideoRestorationController: ObservableObject {
 
     @Published private(set) var phase: Phase = .idle
     @Published private(set) var progress = 0.0
+    @Published private(set) var estimatedRemainingSeconds: Double?
+    @Published private(set) var completionElapsedSeconds: Double?
+    private var timeEstimate = RestorationTimeEstimate()
+    @Published private(set) var reusedFrameCount: Int64 = 0
+    @Published private(set) var completionSummary: RestorationCompletionSummary?
+
+    private let now: @Sendable () -> Double
+    private var summaryContext: (method: RestorationMethod, frameCount: Int64, startedAt: Double)?
 
     private let pipelineBuilder: any FullVideoRestorationPipelineBuilding
     private let temporaryDirectory: URL
@@ -26,8 +34,10 @@ final class FullVideoRestorationController: ObservableObject {
 
     init(
         pipelineBuilder: any FullVideoRestorationPipelineBuilding,
-        temporaryDirectory: URL = FileManager.default.temporaryDirectory
+        temporaryDirectory: URL = FileManager.default.temporaryDirectory,
+        now: @escaping @Sendable () -> Double = { ProcessInfo.processInfo.systemUptime }
     ) {
+        self.now = now
         self.pipelineBuilder = pipelineBuilder
         self.temporaryDirectory = temporaryDirectory
     }
@@ -56,20 +66,32 @@ final class FullVideoRestorationController: ObservableObject {
         plan: RestorationPlan,
         gainEnabled: Bool,
         aacStereoEnabled: Bool,
-        subtitleSelection: SubtitleSelection
+        subtitleSelection: SubtitleSelection,
+        checkpointDirectory: URL? = nil,
+        checkpointMode: RestorationCheckpointMode? = nil
     ) {
         guard !isActive else { return }
+        completionSummary = nil
+        reusedFrameCount = 0
+        estimatedRemainingSeconds = nil
+        completionElapsedSeconds = nil
+        timeEstimate = RestorationTimeEstimate()
+        summaryContext = nil
 
         do {
-            let request = try makeRequest(
+            let request = try Self.makeRequest(
                 sourceURL: sourceURL,
                 inspection: inspection,
                 outputURL: outputURL,
                 plan: plan,
                 gainEnabled: gainEnabled,
                 aacStereoEnabled: aacStereoEnabled,
-                subtitleSelection: subtitleSelection
+                subtitleSelection: subtitleSelection,
+                temporaryDirectory: temporaryDirectory,
+                checkpointDirectory: checkpointDirectory, checkpointMode: checkpointMode
             )
+            if checkpointMode != nil { try RestorationBatchPreflight().check(request) }
+            summaryContext = (request.plan.method, request.totalFrameCount, now())
             phase = .preparing
             progress = 0
             cancellationRequested = false
@@ -88,6 +110,7 @@ final class FullVideoRestorationController: ObservableObject {
                     self.pipeline = pipeline
                     self.startMonitoring(pipeline)
                     let result = await pipeline.run(request)
+                    self.reusedFrameCount = await pipeline.savedFrameCountAtStart()
                     let finalProgress = await pipeline.currentProgress()
                     self.finish(with: result, finalProgress: finalProgress)
                 } catch {
@@ -123,6 +146,12 @@ final class FullVideoRestorationController: ObservableObject {
         guard !isActive else { return }
         phase = .idle
         progress = 0
+        completionSummary = nil
+        reusedFrameCount = 0
+        estimatedRemainingSeconds = nil
+        completionElapsedSeconds = nil
+        timeEstimate = RestorationTimeEstimate()
+        summaryContext = nil
     }
 
     func movePartialOutputToTrash(_ detectedPartialOutputURL: URL? = nil) throws {
@@ -149,14 +178,17 @@ final class FullVideoRestorationController: ObservableObject {
         }
     }
 
-    private func makeRequest(
+    static func makeRequest(
         sourceURL: URL,
         inspection: MediaInspection,
         outputURL: URL,
         plan: RestorationPlan,
         gainEnabled: Bool,
         aacStereoEnabled: Bool,
-        subtitleSelection: SubtitleSelection
+        subtitleSelection: SubtitleSelection,
+        temporaryDirectory: URL = FileManager.default.temporaryDirectory,
+        checkpointDirectory: URL? = nil,
+        checkpointMode: RestorationCheckpointMode? = nil
     ) throws -> FullVideoRestorationRequest {
         guard let duration = inspection.format.duration.flatMap(Double.init),
               let sourceBytes = inspection.format.size.flatMap(Int64.init),
@@ -190,7 +222,7 @@ final class FullVideoRestorationController: ObservableObject {
             subtitleStreamOrdinal = ordinal
         }
 
-        let workspaceURL = temporaryDirectory.appendingPathComponent(
+        let workspaceURL = checkpointDirectory ?? temporaryDirectory.appendingPathComponent(
             "SwiftyTranscoder-Restoration-Full-\(UUID().uuidString)",
             isDirectory: true
         )
@@ -209,11 +241,12 @@ final class FullVideoRestorationController: ObservableObject {
             aacStereoEnabled: aacStereoEnabled,
             subtitleStreamOrdinal: subtitleStreamOrdinal,
             expectedChapterCount: inspection.chapters.count,
-            expectedContainerTitle: title
+            expectedContainerTitle: title,
+            checkpointMode: checkpointMode
         )
     }
 
-    private func exactVideoFrameCount(in inspection: MediaInspection) -> Int64? {
+    private static func exactVideoFrameCount(in inspection: MediaInspection) -> Int64? {
         guard let value = inspection.videoStreams.first?.numberOfFrames,
               let count = Int64(value), count > 0 else { return nil }
         return count
@@ -225,8 +258,14 @@ final class FullVideoRestorationController: ObservableObject {
                 guard let self else { return }
                 let progress = await pipeline.currentProgress()
                 let state = await pipeline.currentState()
+                let savedFrames = await pipeline.savedFrameCountAtStart()
                 guard !Task.isCancelled else { return }
                 self.progress = progress
+                if case .running = state, let context = self.summaryContext {
+                    self.reusedFrameCount = savedFrames
+                    let baseline = 0.90 * Double(self.reusedFrameCount) / Double(context.frameCount)
+                    self.estimatedRemainingSeconds = self.timeEstimate.update(progress: max(progress, baseline), now: self.now())
+                }
                 self.apply(state)
                 try? await Task.sleep(for: .milliseconds(100))
             }
@@ -241,6 +280,17 @@ final class FullVideoRestorationController: ObservableObject {
         monitorTask = nil
         runTask = nil
         endSystemActivity()
+        estimatedRemainingSeconds = nil
+        if case .completed = state, let context = summaryContext {
+            completionElapsedSeconds = now() - context.startedAt
+            completionSummary = RestorationCompletionSummary(
+                method: context.method, frameCount: context.frameCount - reusedFrameCount,
+                elapsedSeconds: completionElapsedSeconds!
+            )
+        } else {
+            completionSummary = nil
+        }
+        summaryContext = nil
         progress = min(max(finalProgress, 0), 1)
         apply(state)
         pipeline = nil

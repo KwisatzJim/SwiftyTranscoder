@@ -3,6 +3,109 @@ import Testing
 @testable import SwiftyTranscoderCore
 
 struct FullVideoRestorationPipelineFactoryTests {
+    @Test(arguments: [RestorationMethod.compactGeneral, .lightweightFSRCNN])
+    func refusesMissingSelectedModelInsteadOfUsingDetailedModel(method: RestorationMethod) throws {
+        let unavailable = URL(fileURLWithPath: "/private/tmp/missing-compact-model-\(UUID().uuidString)")
+        let plan = RestorationPlan(
+            method: method, sourceWidth: 624, sourceHeight: 352,
+            outputWidth: 1248, outputHeight: 704, frameRate: "24000/1001",
+            colorRange: "tv", colorSpace: "smpte170m", colorTransfer: "bt709", colorPrimaries: "smpte170m"
+        )
+        let resources = FullVideoRestorationResources(ffmpegURL: unavailable, ffprobeURL: unavailable, modelURL: unavailable)
+        #expect(throws: FullVideoRestorationFactoryError.modelUnavailable) {
+            try resources.makeFrameProcessor(for: plan)
+        }
+        var selected = resources
+        if method == .lightweightFSRCNN { selected.lightweightModelURL = unavailable }
+        else { selected.fastModelURL = unavailable }
+        #expect(throws: CoreMLRestorationError.modelMissing) {
+            try selected.makeFrameProcessor(for: plan)
+        }
+    }
+
+    @Test func completesCapped720pRestorationWhenOptedIn() async throws {
+        guard ProcessInfo.processInfo.environment["SWIFTY_HD_SMOKE"] == "1" else { return }
+        let project = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        let source = project.appendingPathComponent(".build/milestone108-dimensions/inputs/Pilot-HD.mp4")
+        let helpers = project.appendingPathComponent(".build/Milestone101DerivedData/Build/Products/Debug/SwiftyTranscoder.app/Contents/Helpers")
+        let ffprobe = helpers.appendingPathComponent("ffprobe")
+        let inspection = try probe(source, with: ffprobe)
+        guard case .eligible(let plan) = RestorationPlanner().plan(for: inspection) else {
+            Issue.record("The HD fixture must be eligible for restoration.")
+            return
+        }
+        #expect(plan.sourceWidth == 1280 && plan.sourceHeight == 720)
+        #expect(plan.outputWidth == 1920 && plan.outputHeight == 1080)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("SwiftyTranscoder-HDRegression-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let output = root.appendingPathComponent("restored.mp4")
+        let request = try FullVideoRestorationRequest(
+            sourceURL: source, workspaceURL: root.appendingPathComponent("SwiftyTranscoder-Restoration-HD"),
+            finalOutputURL: output, plan: plan, totalFrameCount: 4,
+            durationSeconds: 4 / (try #require(RestorationVideoAssembly.frameRateValue(plan.frameRate))),
+            sourceAudio: try #require(inspection.audioStreams.first), gainEnabled: false,
+            aacStereoEnabled: false, expectedChapterCount: 0, expectedContainerTitle: nil
+        )
+        let resources = FullVideoRestorationResources(
+            ffmpegURL: helpers.appendingPathComponent("ffmpeg"), ffprobeURL: ffprobe,
+            modelURL: project.appendingPathComponent(".build/restoration-evaluation/converter/weights/RealESRGAN_x2plus_522_fp16.mlpackage")
+        )
+        let pipeline = try FullVideoRestorationPipelineFactory(resources: resources).makePipeline(for: request)
+        #expect(await pipeline.run(request) == .completed(output: output))
+        let result = try probe(output, with: ffprobe)
+        let video = try #require(result.videoStreams.first)
+        #expect(video.width == 1920 && video.height == 1080)
+        #expect(video.numberOfFrames == "4")
+        #expect(!FileManager.default.fileExists(atPath: request.workspaceURL.path))
+    }
+
+    @Test func restoresSDFrameWithoutLoadingTiledModelWhenResourcesAreAvailable() async throws {
+        let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        let research = root.appendingPathComponent(".build/restoration-evaluation/sd-shape-experiment")
+        let sdModel = research.appendingPathComponent(FullVideoRestorationResources.sdModelName)
+        let source = research.appendingPathComponent("face/source-frames/frame-0001.png")
+        guard FileManager.default.fileExists(atPath: sdModel.path),
+              FileManager.default.fileExists(atPath: source.path) else { return }
+        let workspace = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "SwiftyTranscoder-SDSelection-\(UUID().uuidString)"
+        )
+        try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: workspace) }
+        let missingTiledModel = workspace.appendingPathComponent("missing.mlpackage")
+        let resources = FullVideoRestorationResources(
+            ffmpegURL: workspace, ffprobeURL: workspace,
+            modelURL: missingTiledModel, sdModelURL: sdModel
+        )
+        let plan = RestorationPlan(
+            method: .realESRGANX2Plus, sourceWidth: 624, sourceHeight: 352,
+            outputWidth: 1248, outputHeight: 704, frameRate: "24000/1001",
+            colorRange: "tv", colorSpace: "smpte170m", colorTransfer: "bt709",
+            colorPrimaries: "smpte170m"
+        )
+        let processor = try resources.makeFrameProcessor(for: plan)
+        let output = try await processor.process(
+            sourceURL: source, outputURL: workspace.appendingPathComponent("frame.png"),
+            expectedWidth: 624, expectedHeight: 352
+        )
+        #expect(FileManager.default.fileExists(atPath: output.path))
+
+        // A present but invalid selected SD model must fail, not use tiled fallback.
+        let invalidResources = FullVideoRestorationResources(
+            ffmpegURL: workspace, ffprobeURL: workspace,
+            modelURL: missingTiledModel, sdModelURL: workspace.appendingPathComponent("invalid.mlpackage")
+        )
+        #expect(throws: CoreMLRestorationError.modelMissing) {
+            try invalidResources.makeFrameProcessor(for: plan)
+        }
+        let fallbackResources = FullVideoRestorationResources(
+            ffmpegURL: workspace, ffprobeURL: workspace, modelURL: missingTiledModel
+        )
+        #expect(throws: CoreMLRestorationError.modelMissing) {
+            try fallbackResources.makeFrameProcessor(for: plan)
+        }
+    }
+
     @Test func rejectsHelperWithoutSegmentJoinCapability() throws {
         let fixture = try RestorationResourceFixture(includeFFmpeg: true, includeFFprobe: true)
         defer { fixture.remove() }

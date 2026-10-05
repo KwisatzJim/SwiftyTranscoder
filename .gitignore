@@ -10,3 +10,8 @@ dist/
 *.partial.mp4
 *.xcuserstate
 xcuserdata/
+
+# Local Python caches and research environments
+__pycache__/
+*.py[cod]
+.venv/

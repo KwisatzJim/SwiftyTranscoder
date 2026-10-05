@@ -34,8 +34,8 @@ if [[ ! -d "$notices_path" ]]; then
 fi
 
 notice_count="$(find "$notices_path" -type f | wc -l | tr -d ' ')"
-if [[ "$notice_count" -ne 7 ]]; then
-    echo "Expected 7 third-party notices, found $notice_count." >&2
+if [[ "$notice_count" -ne 9 ]]; then
+    echo "Expected 9 third-party notices, found $notice_count." >&2
     exit 1
 fi
 
@@ -62,6 +62,17 @@ verify_checksum "4a699ec4863d96a91fc265948a0c90033f7e8735d515524dcf3444736406e0c
 verify_checksum "f7ab86b57d5bd1d2dc4b373e1ffbde5345cbc19059e85401d5f157873730eabf" "$sd_model_path/Manifest.json"
 verify_checksum "21fc2a660891b7435418c3cb9d57eabd920d0e3f57440bdc8632efe4c50a7fd8" "$sd_model_path/Data/com.apple.CoreML/model.mlmodel"
 verify_checksum "a8904f0bb627d5dbce2468a96c648764a63ece561cfcf118da6321831bb3a926" "$sd_model_path/Data/com.apple.CoreML/weights/weight.bin"
+
+compact_path="$app_path/Contents/Resources/Models/RealESRGAN_general_x2_522_fp16.mlpackage"
+lightweight_path="$app_path/Contents/Resources/Models/FSRCNN_x2_RGB_522_fp16.mlpackage"
+verify_checksum "9878f924115d8c8e78610fc4b00029d827750bc0d96e9fb57eda9d6c1d540402" "$compact_path/Manifest.json"
+verify_checksum "f73dbe79485ee9ba81aede548a18fec2d39969f0b3ea5fc3f4e982bd5de22ded" "$compact_path/Data/com.apple.CoreML/model.mlmodel"
+verify_checksum "7a6088b2ee537938f380b9049fae2b85dad57b251d047ab8f5afd256417838ec" "$compact_path/Data/com.apple.CoreML/weights/weight.bin"
+verify_checksum "65bc1cb2d12c85e77f63f105e210f2b3fc011ccfebeffc7592289dc43fbcc4ee" "$lightweight_path/Manifest.json"
+verify_checksum "77e39276f595f522674022564346090bcd6fc17134dabd7ef3877c03fc9f531c" "$lightweight_path/Data/com.apple.CoreML/model.mlmodel"
+verify_checksum "d21b1ae5f2959fa4ea86fe69aa880fc71aefe612cef7a41efbb04e46716dbb60" "$lightweight_path/Data/com.apple.CoreML/weights/weight.bin"
+verify_checksum "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4" "$notices_path/FSRCNN-LICENSE.txt"
+grep -q 'https://github.com/Saafke/FSRCNN_Tensorflow' "$notices_path/FSRCNN-Attribution.txt"
 
 architectures="$(lipo -archs "$executable_path")"
 if [[ "$architectures" != "arm64" ]]; then
@@ -91,5 +102,6 @@ done
 "$ffmpeg_path" -hide_banner -demuxers | grep -q ' concat '
 
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app_path/Contents/Info.plist")"
+"$executable_path" --help | grep -q '^Usage: swiftytranscoder '
 build_number="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app_path/Contents/Info.plist")"
 echo "Verified SwiftyTranscoder ${version} (${build_number}): arm64 app, signed bundled helpers, restoration model, notices, and required media capabilities."

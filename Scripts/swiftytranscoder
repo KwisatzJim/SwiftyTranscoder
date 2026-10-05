@@ -1,0 +1,15 @@
+#!/bin/zsh
+set -eu
+
+# Explicit override allows testing without replacing the installed release.
+task_app_path="${SWIFTYTRANSCODER_APP:-/Applications/SwiftyTranscoder.app}"
+task_executable="$task_app_path/Contents/MacOS/SwiftyTranscoder"
+if [[ ! -x "$task_executable" ]]; then
+    print -u2 "SwiftyTranscoder app not found: $task_app_path"
+    print -u2 "Set SWIFTYTRANSCODER_APP to a CLI-enabled app bundle."
+    exit 1
+fi
+if [[ $# -eq 0 ]]; then
+    exec "$task_executable" --help
+fi
+exec "$task_executable" "$@"

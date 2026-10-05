@@ -1,0 +1,9 @@
+# Milestone 112 — Selectable lightweight AI
+
+The user accepted the milestone 111 FSRCNN preview. The optimized development app now exposes “Lightweight AI · FSRCNN (experimental)” alongside the existing detailed and compact choices. Selection flows through the existing reviewed plan to preview and full/batch processing. The default detailed choice is preserved. A missing selected model fails explicitly rather than silently using another model.
+
+The embedding script verifies the package manifest, model, weights, and Apache license checksums before copying the model and attribution. Inclusion follows the existing development/explicit experimental-build flag. The separate app is `.build/Milestone112DerivedData/Build/Products/Release/SwiftyTranscoder.app`; installed 1.2.0 and any active restoration are untouched.
+
+Validation: optimized Xcode build, strict deep code-sign verification, shell syntax, and whitespace checks passed. Factory regression tests passed (10 tests including both experimental methods). The short production integration test now locates resources from the built app with development/fallback paths disabled and selects FSRCNN explicitly. Reviewed-batch tests passed for both experimental methods. Bundled FSRCNN restored the ten-second Pilot clip in 34.322 seconds after preparation; validation confirmed 1920×1080, all 240 frames, AC-3 plus AAC, and workspace cleanup. Output: `.build/milestone112-review/Pilot-Lightweight-AI.mp4`. The first integration attempt overlapped a rebuild that replaced helper executables; the stable-build rerun passed.
+
+The user confirmed the short preview from the new app with the lightweight option selected. The next performance change will target image packing/writing, which accounts for about 65% of the measured FSRCNN frame processing. No further speedup is claimed by this integration.

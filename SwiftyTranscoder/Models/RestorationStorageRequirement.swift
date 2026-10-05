@@ -35,10 +35,16 @@ struct RestorationStorageRequirement: Equatable, Sendable {
         )
         let chunkCount = (frameCount + maximumResidentFrameCount - 1) / maximumResidentFrameCount
 
-        guard let sourcePixels = multiplied(Int64(plan.sourceWidth), Int64(plan.sourceHeight)),
-              let outputPixels = multiplied(Int64(plan.outputWidth), Int64(plan.outputHeight)),
-              let pixelsPerFrame = added(sourcePixels, outputPixels),
-              let frameBytes = multiplied(pixelsPerFrame, 4),
+        // Restored PNGs are always 2× source dimensions; the 1080p cap is applied
+        // later during video assembly. Include PNG/zlib overhead for larger files.
+        let restoredWidth = plan.sourceWidth.multipliedReportingOverflow(by: RestorationFrameGeometry.scale)
+        let restoredHeight = plan.sourceHeight.multipliedReportingOverflow(by: RestorationFrameGeometry.scale)
+        guard !restoredWidth.overflow, !restoredHeight.overflow,
+              let sourceFrameBytes = RestorationPNGEncoder.maximumFileBytes(width: plan.sourceWidth, height: plan.sourceHeight),
+              let restoredFrameBytes = RestorationPNGEncoder.maximumFileBytes(width: restoredWidth.partialValue, height: restoredHeight.partialValue),
+              // Allow extra metadata chunks in FFmpeg source PNGs.
+              let sourceFrameWithMetadata = added(sourceFrameBytes, 1024),
+              let frameBytes = added(sourceFrameWithMetadata, restoredFrameBytes),
               let sequenceBytes = multiplied(frameBytes, maximumResidentFrameCount),
               let encodedWorkingBytes = multiplied(sourceBytes, 2),
               let withEncodedFiles = added(sequenceBytes, encodedWorkingBytes),

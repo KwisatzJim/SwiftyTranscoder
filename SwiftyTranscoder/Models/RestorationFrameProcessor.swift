@@ -69,10 +69,12 @@ struct RestorationFrameTimings: Sendable {
     var inference = 0.0
     var blending = 0.0
     var output = 0.0
+    var pixelPacking = 0.0
+    var pngWriting = 0.0
 }
 
 actor RestorationFrameProcessor: RestorationFrameProcessing {
-    private let tileProcessor: any RestorationTileProcessing
+    private let tileProcessor: (any RestorationTileProcessing)?
     private let sdFrameProcessor: (any RestorationTileProcessing)?
     private var cancellationRequested = false
     private(set) var progress = 0.0
@@ -80,6 +82,11 @@ actor RestorationFrameProcessor: RestorationFrameProcessing {
 
     init(tileProcessor: any RestorationTileProcessing, sdFrameProcessor: (any RestorationTileProcessing)? = nil) {
         self.tileProcessor = tileProcessor
+        self.sdFrameProcessor = sdFrameProcessor
+    }
+
+    init(sdFrameProcessor: any RestorationTileProcessing) {
+        self.tileProcessor = nil
         self.sdFrameProcessor = sdFrameProcessor
     }
 
@@ -117,6 +124,9 @@ actor RestorationFrameProcessor: RestorationFrameProcessing {
         if source.width == 624, source.height == 352, let sdFrameProcessor {
             return try await processSDFrame(source, outputURL: outputURL, processor: sdFrameProcessor, timings: timings)
         }
+        guard let tileProcessor else {
+            throw RestorationFrameProcessorError.tiledProcessorUnavailable
+        }
         let geometry = try RestorationFrameGeometry(width: source.width, height: source.height)
         let accumulatedWidth = geometry.paddedWidth * RestorationFrameGeometry.scale
         let accumulatedHeight = geometry.paddedHeight * RestorationFrameGeometry.scale
@@ -143,18 +153,20 @@ actor RestorationFrameProcessor: RestorationFrameProcessing {
                 timings.inference += ProcessInfo.processInfo.systemUptime - started
                 try checkCancellation()
                 started = ProcessInfo.processInfo.systemUptime
-                Self.accumulate(
-                    restored.values,
-                    into: &accumulated,
-                    counts: &counts,
-                    accumulatedWidth: accumulatedWidth,
-                    tileX: x,
-                    tileY: y,
-                    xIndex: xIndex,
-                    yIndex: yIndex,
-                    xPositions: geometry.xPositions,
-                    yPositions: geometry.yPositions
-                )
+                autoreleasepool {
+                    Self.accumulate(
+                        restored.values,
+                        into: &accumulated,
+                        counts: &counts,
+                        accumulatedWidth: accumulatedWidth,
+                        tileX: x,
+                        tileY: y,
+                        xIndex: xIndex,
+                        yIndex: yIndex,
+                        xPositions: geometry.xPositions,
+                        yPositions: geometry.yPositions
+                    )
+                }
                 timings.blending += ProcessInfo.processInfo.systemUptime - started
                 completedTiles += 1
                 progress = Double(completedTiles) / Double(geometry.tileCount)
@@ -168,15 +180,18 @@ actor RestorationFrameProcessor: RestorationFrameProcessing {
             accumulatedWidth: accumulatedWidth,
             geometry: geometry
         )
+        timings.pixelPacking = ProcessInfo.processInfo.systemUptime - started
+        started = ProcessInfo.processInfo.systemUptime
         try Self.writePNG(output, width: geometry.outputWidth, height: geometry.outputHeight, to: outputURL)
-        timings.output = ProcessInfo.processInfo.systemUptime - started
+        timings.pngWriting = ProcessInfo.processInfo.systemUptime - started
+        timings.output = timings.pixelPacking + timings.pngWriting
         latestTimings = timings
         return outputURL
     }
 
     func cancel() async {
         cancellationRequested = true
-        await tileProcessor.cancel()
+        await tileProcessor?.cancel()
         await sdFrameProcessor?.cancel()
     }
 
@@ -186,21 +201,24 @@ actor RestorationFrameProcessor: RestorationFrameProcessing {
     ) async throws -> URL {
         var timings = initialTimings
         var started = ProcessInfo.processInfo.systemUptime
-        let shape = RestorationModelLayout.sdFrame.inputShape
-        let input = try MLMultiArray(shape: shape.map(NSNumber.init), dataType: .float16)
-        let inputPointer = input.dataPointer.bindMemory(to: Float16.self, capacity: input.count)
-        let inputStrides = input.strides.map(\.intValue)
-        for y in 0..<shape[2] {
-            try checkCancellation()
-            let sourceY = RestorationFrameGeometry.reflectedIndex(y - 16, length: source.height)
-            for x in 0..<shape[3] {
-                let sourceX = RestorationFrameGeometry.reflectedIndex(x - 16, length: source.width)
-                let offset = (sourceY * source.width + sourceX) * 4
-                for channel in 0..<3 {
-                    inputPointer[channel * inputStrides[1] + y * inputStrides[2] + x * inputStrides[3]] =
-                        Float16(Float(source.bytes[offset + channel]) / 255)
+        let input = try autoreleasepool {
+            let shape = RestorationModelLayout.sdFrame.inputShape
+            let input = try MLMultiArray(shape: shape.map(NSNumber.init), dataType: .float16)
+            let inputPointer = input.dataPointer.bindMemory(to: Float16.self, capacity: input.count)
+            let inputStrides = input.strides.map(\.intValue)
+            for y in 0..<shape[2] {
+                try checkCancellation()
+                let sourceY = RestorationFrameGeometry.reflectedIndex(y - 16, length: source.height)
+                for x in 0..<shape[3] {
+                    let sourceX = RestorationFrameGeometry.reflectedIndex(x - 16, length: source.width)
+                    let offset = (sourceY * source.width + sourceX) * 4
+                    for channel in 0..<3 {
+                        inputPointer[channel * inputStrides[1] + y * inputStrides[2] + x * inputStrides[3]] =
+                            Float16(Float(source.bytes[offset + channel]) / 255)
+                    }
                 }
             }
+            return input
         }
         timings.tensorPreparation = ProcessInfo.processInfo.systemUptime - started
         started = ProcessInfo.processInfo.systemUptime
@@ -212,23 +230,25 @@ actor RestorationFrameProcessor: RestorationFrameProcessing {
         }
         timings.inference = ProcessInfo.processInfo.systemUptime - started
         started = ProcessInfo.processInfo.systemUptime
-        let outputWidth = source.width * 2
-        let outputHeight = source.height * 2
-        var bytes = [UInt8](repeating: 255, count: outputWidth * outputHeight * 4)
-        let values = restored.values.dataPointer.bindMemory(to: Float16.self, capacity: restored.values.count)
-        let strides = restored.values.strides.map(\.intValue)
-        for y in 0..<outputHeight {
-            try checkCancellation()
-            for x in 0..<outputWidth {
-                for channel in 0..<3 {
-                    let value = Float(values[channel * strides[1] + (y + 32) * strides[2] + (x + 32) * strides[3]])
-                    guard value.isFinite else { throw CoreMLRestorationError.nonFiniteOutput }
-                    bytes[(y * outputWidth + x) * 4 + channel] =
-                        UInt8(clamping: Int((min(max(value, 0), 1) * 255).rounded()))
+        try autoreleasepool {
+            let outputWidth = source.width * 2
+            let outputHeight = source.height * 2
+            var bytes = [UInt8](repeating: 255, count: outputWidth * outputHeight * 4)
+            let values = restored.values.dataPointer.bindMemory(to: Float16.self, capacity: restored.values.count)
+            let strides = restored.values.strides.map(\.intValue)
+            for y in 0..<outputHeight {
+                try checkCancellation()
+                for x in 0..<outputWidth {
+                    for channel in 0..<3 {
+                        let value = Float(values[channel * strides[1] + (y + 32) * strides[2] + (x + 32) * strides[3]])
+                        guard value.isFinite else { throw CoreMLRestorationError.nonFiniteOutput }
+                        bytes[(y * outputWidth + x) * 4 + channel] =
+                            UInt8(clamping: Int((min(max(value, 0), 1) * 255).rounded()))
+                    }
                 }
             }
+            try Self.writePNG(bytes, width: outputWidth, height: outputHeight, to: outputURL)
         }
-        try Self.writePNG(bytes, width: outputWidth, height: outputHeight, to: outputURL)
         timings.output = ProcessInfo.processInfo.systemUptime - started
         latestTimings = timings
         progress = 1
@@ -246,6 +266,12 @@ actor RestorationFrameProcessor: RestorationFrameProcessing {
     }
 
     private static func loadRGBA(_ url: URL) throws -> RGBAImage {
+        try autoreleasepool {
+            try decodeRGBA(url)
+        }
+    }
+
+    private static func decodeRGBA(_ url: URL) throws -> RGBAImage {
         guard let data = try? Data(contentsOf: url),
               let source = NSBitmapImageRep(data: data),
               let destination = NSBitmapImageRep(
@@ -283,34 +309,36 @@ actor RestorationFrameProcessor: RestorationFrameProcessing {
         tileX: Int,
         tileY: Int
     ) throws -> RestorationTileTensor {
-        let values = try MLMultiArray(
-            shape: RestorationModelContract.expectedInputShape.map(NSNumber.init),
-            dataType: .float16
-        )
-        let pointer = values.dataPointer.bindMemory(to: Float16.self, capacity: values.count)
-        let strides = values.strides.map(\.intValue)
-        for tileYPosition in 0..<RestorationFrameGeometry.tileSize {
-            let paddedY = tileY + tileYPosition
-            let sourceY = RestorationFrameGeometry.reflectedIndex(
-                paddedY - geometry.topPadding,
-                length: source.height
+        try autoreleasepool {
+            let values = try MLMultiArray(
+                shape: RestorationModelContract.expectedInputShape.map(NSNumber.init),
+                dataType: .float16
             )
-            for tileXPosition in 0..<RestorationFrameGeometry.tileSize {
-                let paddedX = tileX + tileXPosition
-                let sourceX = RestorationFrameGeometry.reflectedIndex(
-                    paddedX - geometry.leftPadding,
-                    length: source.width
+            let pointer = values.dataPointer.bindMemory(to: Float16.self, capacity: values.count)
+            let strides = values.strides.map(\.intValue)
+            for tileYPosition in 0..<RestorationFrameGeometry.tileSize {
+                let paddedY = tileY + tileYPosition
+                let sourceY = RestorationFrameGeometry.reflectedIndex(
+                    paddedY - geometry.topPadding,
+                    length: source.height
                 )
-                let sourceOffset = (sourceY * source.width + sourceX) * 4
-                for channel in 0..<3 {
-                    let tensorOffset = channel * strides[1]
-                        + tileYPosition * strides[2]
-                        + tileXPosition * strides[3]
-                    pointer[tensorOffset] = Float16(Float(source.bytes[sourceOffset + channel]) / 255)
+                for tileXPosition in 0..<RestorationFrameGeometry.tileSize {
+                    let paddedX = tileX + tileXPosition
+                    let sourceX = RestorationFrameGeometry.reflectedIndex(
+                        paddedX - geometry.leftPadding,
+                        length: source.width
+                    )
+                    let sourceOffset = (sourceY * source.width + sourceX) * 4
+                    for channel in 0..<3 {
+                        let tensorOffset = channel * strides[1]
+                            + tileYPosition * strides[2]
+                            + tileXPosition * strides[3]
+                        pointer[tensorOffset] = Float16(Float(source.bytes[sourceOffset + channel]) / 255)
+                    }
                 }
             }
+            return RestorationTileTensor(values: values)
         }
-        return RestorationTileTensor(values: values)
     }
 
     private static func accumulate(
@@ -397,24 +425,13 @@ actor RestorationFrameProcessor: RestorationFrameProcessing {
     }
 
     private static func writePNG(_ bytes: [UInt8], width: Int, height: Int, to url: URL) throws {
-        guard let representation = NSBitmapImageRep(
-            bitmapDataPlanes: nil,
-            pixelsWide: width,
-            pixelsHigh: height,
-            bitsPerSample: 8,
-            samplesPerPixel: 4,
-            hasAlpha: true,
-            isPlanar: false,
-            colorSpaceName: .deviceRGB,
-            bytesPerRow: width * 4,
-            bitsPerPixel: 32
-        ), let destination = representation.bitmapData else {
-            throw RestorationFrameProcessorError.couldNotEncode
+        try autoreleasepool {
+            try encodePNG(bytes, width: width, height: height, to: url)
         }
-        destination.update(from: bytes, count: bytes.count)
-        guard let data = representation.representation(using: .png, properties: [:]) else {
-            throw RestorationFrameProcessorError.couldNotEncode
-        }
+    }
+
+    private static func encodePNG(_ bytes: [UInt8], width: Int, height: Int, to url: URL) throws {
+        let data = try RestorationPNGEncoder.encode(bytes, width: width, height: height)
         try data.write(to: url, options: .withoutOverwriting)
     }
 }
@@ -428,6 +445,7 @@ enum RestorationFrameProcessorError: LocalizedError, Equatable {
     case unexpectedDimensions(expectedWidth: Int, expectedHeight: Int, actualWidth: Int, actualHeight: Int)
     case uncoveredOutputPixel
     case couldNotEncode
+    case tiledProcessorUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -440,6 +458,7 @@ enum RestorationFrameProcessorError: LocalizedError, Equatable {
             "Expected a \(expectedWidth) × \(expectedHeight) frame but found \(actualWidth) × \(actualHeight)."
         case .uncoveredOutputPixel: "Tile blending left an output pixel uncovered."
         case .couldNotEncode: "The restored frame could not be encoded as PNG."
+        case .tiledProcessorUnavailable: "This restoration processor supports only 624 × 352 source frames."
         }
     }
 }

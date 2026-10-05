@@ -52,6 +52,9 @@ struct RestorationPreviewView: View {
                     Button("Create Restoration Preview", systemImage: "sparkles.tv") { start() }
                         .buttonStyle(.borderedProminent)
                         .disabled(disabled)
+                case .preparing:
+                    ProgressView("Preparing AI restoration model…")
+                    Button("Cancel Preview", role: .cancel) { controller.cancel() }
                 case .running(let stage):
                     ProgressView(value: controller.progress) {
                         Text(stageLabel(stage))

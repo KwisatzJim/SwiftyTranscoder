@@ -87,4 +87,35 @@ cp "$model_license_source" "$notices_destination/Real-ESRGAN-LICENSE.txt"
 ditto "$model_source" "$model_destination"
 ditto "$sd_model_source" "$sd_model_destination"
 
+# Accepted model choices are required in every app build, including releases.
+fast_name="RealESRGAN_general_x2_522_fp16.mlpackage"
+fast_source="$project_root/.build/restoration-evaluation/fast-candidate/$fast_name"
+if [[ ! -d "$fast_source" ]]; then
+    echo "error: Missing prepared compact model: $fast_source" >&2
+    exit 1
+fi
+{
+    verify_checksum "9878f924115d8c8e78610fc4b00029d827750bc0d96e9fb57eda9d6c1d540402" "$fast_source/Manifest.json"
+    verify_checksum "f73dbe79485ee9ba81aede548a18fec2d39969f0b3ea5fc3f4e982bd5de22ded" "$fast_source/Data/com.apple.CoreML/model.mlmodel"
+    verify_checksum "7a6088b2ee537938f380b9049fae2b85dad57b251d047ab8f5afd256417838ec" "$fast_source/Data/com.apple.CoreML/weights/weight.bin"
+    ditto "$fast_source" "$app_contents/Resources/Models/$fast_name"
+}
+
+lightweight_name="FSRCNN_x2_RGB_522_fp16.mlpackage"
+lightweight_root="$project_root/.build/restoration-evaluation/fsrcnn-candidate"
+lightweight_source="$lightweight_root/$lightweight_name"
+if [[ ! -d "$lightweight_source" || ! -f "$lightweight_root/LICENSE" ]]; then
+    echo "error: Missing prepared FSRCNN model or license: $lightweight_root" >&2
+    exit 1
+fi
+{
+    verify_checksum "65bc1cb2d12c85e77f63f105e210f2b3fc011ccfebeffc7592289dc43fbcc4ee" "$lightweight_source/Manifest.json"
+    verify_checksum "77e39276f595f522674022564346090bcd6fc17134dabd7ef3877c03fc9f531c" "$lightweight_source/Data/com.apple.CoreML/model.mlmodel"
+    verify_checksum "d21b1ae5f2959fa4ea86fe69aa880fc71aefe612cef7a41efbb04e46716dbb60" "$lightweight_source/Data/com.apple.CoreML/weights/weight.bin"
+    verify_checksum "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4" "$lightweight_root/LICENSE"
+    ditto "$lightweight_source" "$app_contents/Resources/Models/$lightweight_name"
+    cp "$lightweight_root/LICENSE" "$notices_destination/FSRCNN-LICENSE.txt"
+    echo "FSRCNN x2 weights: Saafke/FSRCNN_Tensorflow, https://github.com/Saafke/FSRCNN_Tensorflow. RGB Core ML adaptation by SwiftyTranscoder." > "$notices_destination/FSRCNN-Attribution.txt"
+}
+
 echo "Embedded verified FFmpeg helpers, restoration model, and third-party notices."

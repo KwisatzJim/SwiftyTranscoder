@@ -102,7 +102,7 @@ The user confirmed the corrected build detected the partial file after relaunch,
 
 The user completed the full Reacher video-only conversion. The controller validated and promoted the partial output to:
 
-`/Volumes/myMedia/programming_projects/SwiftyTranscoder/Reacher - s04e08 - Cut.mp4`
+`/path/to/SwiftyTranscoder/Reacher - s04e08 - Cut.mp4`
 
 The user confirmed that the resulting file looks good and plays correctly. A separate `ffprobe` inspection confirmed:
 

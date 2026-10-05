@@ -1,4 +1,5 @@
 import CoreML
+import Darwin
 import Foundation
 import Testing
 @testable import SwiftyTranscoderCore
@@ -22,6 +23,26 @@ struct RestorationPerformanceTests {
         try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: workspace) }
         let clock = { ProcessInfo.processInfo.systemUptime }
+        // macOS reports ru_maxrss in bytes. This covers this test process only,
+        // not FFmpeg children or allocations in external Core ML services.
+        func reportPeakMemory(_ stage: String) {
+            var usage = rusage()
+            guard getrusage(RUSAGE_SELF, &usage) == 0 else { return }
+            print(String(format: "Restoration benchmark process peak RSS after %@: %.1f MiB",
+                         stage, Double(usage.ru_maxrss) / 1_048_576))
+            var info = mach_task_basic_info()
+            var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size / MemoryLayout<integer_t>.size)
+            let result = withUnsafeMutablePointer(to: &info) { pointer in
+                pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                    task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
+                }
+            }
+            if result == KERN_SUCCESS {
+                print(String(format: "Restoration benchmark process live RSS after %@: %.1f MiB",
+                             stage, Double(info.resident_size) / 1_048_576))
+            }
+        }
+        reportPeakMemory("startup")
         let totalStarted = clock()
         var started = clock()
         let extraction = try RestorationFrameExtraction(
@@ -29,20 +50,28 @@ struct RestorationPerformanceTests {
         )
         let inputs = try await RestorationFrameExtractor(executableURL: ffmpeg).extract(extraction)
         let extractionSeconds = clock() - started
+        reportPeakMemory("extraction")
         started = clock()
         let useGPU = ProcessInfo.processInfo.environment["SWIFTY_RESTORATION_COMPUTE"] == "gpu"
-        let tileProcessor = try CoreMLRestorationTileProcessor(
-            modelURL: model, computeUnits: useGPU ? .cpuAndGPU : .all
-        )
         print("Restoration benchmark compute units: \(useGPU ? "CPU and GPU" : "all")")
         let useSD = ProcessInfo.processInfo.environment["SWIFTY_RESTORATION_SD"] == "1"
-        let sd = try useSD ? CoreMLRestorationTileProcessor(
-            modelURL: root.appendingPathComponent(".build/restoration-evaluation/sd-shape-experiment/RealESRGAN_x2plus_656x384_fp16.mlpackage"),
-            layout: .sdFrame
-        ) : nil
+        let processor: RestorationFrameProcessor
+        if useSD {
+            let sd = try CoreMLRestorationTileProcessor(
+                modelURL: root.appendingPathComponent(".build/restoration-evaluation/sd-shape-experiment/RealESRGAN_x2plus_656x384_fp16.mlpackage"),
+                computeUnits: useGPU ? .cpuAndGPU : .all,
+                layout: .sdFrame
+            )
+            processor = RestorationFrameProcessor(sdFrameProcessor: sd)
+        } else {
+            let tiles = try CoreMLRestorationTileProcessor(
+                modelURL: model, computeUnits: useGPU ? .cpuAndGPU : .all
+            )
+            processor = RestorationFrameProcessor(tileProcessor: tiles)
+        }
         print("Restoration benchmark SD frame model: \(useSD)")
-        let processor = RestorationFrameProcessor(tileProcessor: tileProcessor, sdFrameProcessor: sd)
         let setupSeconds = clock() - started
+        reportPeakMemory("model setup")
         let outputsDirectory = workspace.appendingPathComponent("restored-frames")
         try FileManager.default.createDirectory(at: outputsDirectory, withIntermediateDirectories: false)
         var outputs: [URL] = []
@@ -61,6 +90,7 @@ struct RestorationPerformanceTests {
             totals.output += timings.output
             if (index + 1).isMultiple(of: 30) {
                 print(String(format: "Restoration benchmark: %d/120 frames, %.2fs", index + 1, clock() - started))
+                reportPeakMemory("\(index + 1) restored frames")
             }
         }
         let restorationSeconds = clock() - started
@@ -74,6 +104,7 @@ struct RestorationPerformanceTests {
         let assembly = try RestorationVideoAssembly(frameURLs: outputs, workspaceURL: workspace, plan: plan)
         let video = try await RestorationVideoAssembler(ffmpegURL: ffmpeg, ffprobeURL: ffprobe).assemble(assembly)
         let encodingSeconds = clock() - started
+        reportPeakMemory("encoding and validation")
         #expect(outputs.count == 120)
         #expect(FileManager.default.fileExists(atPath: video.path))
         print(String(format:

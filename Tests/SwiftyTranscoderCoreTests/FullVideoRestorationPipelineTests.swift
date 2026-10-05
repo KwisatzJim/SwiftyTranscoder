@@ -75,6 +75,27 @@ struct FullVideoRestorationPipelineTests {
         #expect(try String(contentsOf: fixture.finalOutputURL, encoding: .utf8) == "existing")
     }
 
+    @Test func refusesExistingWorkspaceWithoutDeletingItsContents() async throws {
+        let fixture = try FullPipelineFixture()
+        defer { fixture.remove() }
+        try FileManager.default.createDirectory(at: fixture.workspaceURL, withIntermediateDirectories: false)
+        let marker = fixture.workspaceURL.appendingPathComponent("unrelated.txt")
+        try Data("preserve".utf8).write(to: marker)
+        let recorder = FullPipelineRecorder()
+        let pipeline = FullVideoRestorationPipeline(
+            chunkCoordinator: MockFullChunkCoordinator(recorder: recorder),
+            segmentConcatenator: MockFullConcatenator(recorder: recorder),
+            audioMuxer: MockFullAudioMuxer(recorder: recorder),
+            outputPromoter: MockFullPromoter(recorder: recorder)
+        )
+        guard case .failed = await pipeline.run(fixture.request) else {
+            Issue.record("Expected existing workspace refusal")
+            return
+        }
+        #expect(try String(contentsOf: marker, encoding: .utf8) == "preserve")
+        #expect(await recorder.stages.isEmpty)
+    }
+
     @Test func completedPromotionWinsOverLateCancellation() async throws {
         let fixture = try FullPipelineFixture()
         defer { fixture.remove() }

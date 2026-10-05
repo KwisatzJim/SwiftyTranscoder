@@ -5,6 +5,7 @@ import Foundation
 final class RestorationPreviewController: ObservableObject {
     enum Phase: Equatable {
         case idle
+        case preparing
         case running(NativeRestorationPreviewStage)
         case cancelling
         case completed(URL)
@@ -20,7 +21,7 @@ final class RestorationPreviewController: ObservableObject {
 
     var isActive: Bool {
         switch phase {
-        case .running, .cancelling: true
+        case .preparing, .running, .cancelling: true
         default: false
         }
     }
@@ -45,48 +46,61 @@ final class RestorationPreviewController: ObservableObject {
         }
         let frameCount = min(240, max(1, Int((durationSeconds * frameRate).rounded())))
 
-        do {
-            let resources = try FullVideoRestorationResources.locate()
-            let frames = try resources.makeFrameProcessor(for: plan)
-            let extractor = try RestorationFrameExtractor()
-            let assembler = try RestorationVideoAssembler()
-            let audioMuxer = try RestorationAudioMuxer()
-            let pipeline = NativeRestorationPreviewPipeline(
-                extractor: extractor,
-                sequenceProcessor: RestorationFrameSequenceProcessor(frameProcessor: frames),
-                assembler: assembler,
-                audioMuxer: audioMuxer
-            )
-            let workspaceURL = FileManager.default.temporaryDirectory.appendingPathComponent(
-                "SwiftyTranscoder-Restoration-Preview-\(UUID().uuidString)",
-                isDirectory: true
-            )
-            let request = try NativeRestorationPreviewRequest(
-                sourceURL: sourceURL,
-                workspaceURL: workspaceURL,
-                startSeconds: startSeconds,
-                frameCount: frameCount,
-                plan: plan,
-                sourceAudio: sourceAudio,
-                gainEnabled: gainEnabled,
-                aacStereoEnabled: aacStereoEnabled
-            )
-            self.pipeline = pipeline
-            progress = 0
-            phase = .running(.extractingFrames)
-            monitorTask = Task { [weak self] in
-                while !Task.isCancelled {
-                    guard let self, let pipeline = self.pipeline else { return }
-                    self.progress = await pipeline.progress
-                    if case .running(let stage) = await pipeline.state {
-                        self.phase = .running(stage)
-                    }
-                    try? await Task.sleep(for: .milliseconds(100))
+        progress = 0
+        phase = .preparing
+        runTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let preparation = Task.detached(priority: .userInitiated) {
+                    try Task.checkCancellation()
+                    let resources = try FullVideoRestorationResources.locate()
+                    let frames = try resources.makeFrameProcessor(for: plan)
+                    try Task.checkCancellation()
+                    return frames
                 }
-            }
-            runTask = Task { [weak self] in
+                let frames = try await withTaskCancellationHandler {
+                    try await preparation.value
+                } onCancel: {
+                    preparation.cancel()
+                }
+                try Task.checkCancellation()
+                let extractor = try RestorationFrameExtractor()
+                let assembler = try RestorationVideoAssembler()
+                let audioMuxer = try RestorationAudioMuxer()
+                let pipeline = NativeRestorationPreviewPipeline(
+                    extractor: extractor,
+                    sequenceProcessor: RestorationFrameSequenceProcessor(frameProcessor: frames),
+                    assembler: assembler,
+                    audioMuxer: audioMuxer
+                )
+                let workspaceURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+                    "SwiftyTranscoder-Restoration-Preview-\(UUID().uuidString)",
+                    isDirectory: true
+                )
+                let request = try NativeRestorationPreviewRequest(
+                    sourceURL: sourceURL,
+                    workspaceURL: workspaceURL,
+                    startSeconds: startSeconds,
+                    frameCount: frameCount,
+                    plan: plan,
+                    sourceAudio: sourceAudio,
+                    gainEnabled: gainEnabled,
+                    aacStereoEnabled: aacStereoEnabled
+                )
+                self.pipeline = pipeline
+                progress = 0
+                phase = .running(.extractingFrames)
+                monitorTask = Task { [weak self] in
+                    while !Task.isCancelled {
+                        guard let self, let pipeline = self.pipeline else { return }
+                        self.progress = await pipeline.progress
+                        if case .running(let stage) = await pipeline.state, self.phase != .cancelling {
+                            self.phase = .running(stage)
+                        }
+                        try? await Task.sleep(for: .milliseconds(100))
+                    }
+                }
                 let result = await pipeline.run(request)
-                guard let self else { return }
                 self.monitorTask?.cancel()
                 self.monitorTask = nil
                 self.progress = await pipeline.progress
@@ -99,16 +113,21 @@ final class RestorationPreviewController: ObservableObject {
                 case .idle, .running, .cancelling:
                     self.phase = .failed("The restoration preview stopped in an unexpected state.")
                 }
+            } catch {
+                self.pipeline = nil
+                self.runTask = nil
+                self.phase = Task.isCancelled ? .idle : .failed(error.localizedDescription)
             }
-        } catch {
-            phase = .failed(error.localizedDescription)
         }
     }
 
     func cancel() {
-        guard let pipeline, isActive else { return }
+        guard isActive else { return }
         phase = .cancelling
-        Task { await pipeline.cancel() }
+        runTask?.cancel()
+        if let pipeline {
+            Task { await pipeline.cancel() }
+        }
     }
 
     func revealCompletedPreview() {

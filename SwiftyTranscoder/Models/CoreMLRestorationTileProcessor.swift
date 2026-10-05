@@ -86,6 +86,8 @@ actor CoreMLRestorationTileProcessor: RestorationTileProcessing {
     let contract: RestorationModelContract
 
     private let model: MLModel
+    private(set) var totalPredictionSeconds = 0.0
+    private(set) var totalValidationSeconds = 0.0
     private var cancellationRequested = false
 
     init(modelURL: URL, computeUnits: MLComputeUnits = .all, layout: RestorationModelLayout = .tiled) throws {
@@ -115,6 +117,12 @@ actor CoreMLRestorationTileProcessor: RestorationTileProcessing {
     }
 
     func process(_ input: RestorationTileTensor) throws -> RestorationTileTensor {
+        try autoreleasepool {
+            try predictAndValidate(input)
+        }
+    }
+
+    private func predictAndValidate(_ input: RestorationTileTensor) throws -> RestorationTileTensor {
         cancellationRequested = false
         try checkCancellation()
         guard input.values.shape.map(\.intValue) == contract.input.shape,
@@ -126,6 +134,7 @@ actor CoreMLRestorationTileProcessor: RestorationTileProcessing {
             contract.input.name: MLFeatureValue(multiArray: input.values),
         ])
         let prediction: MLFeatureProvider
+        let predictionStarted = ProcessInfo.processInfo.systemUptime
         do {
             prediction = try model.prediction(from: provider)
         } catch {
@@ -133,13 +142,18 @@ actor CoreMLRestorationTileProcessor: RestorationTileProcessing {
             throw CoreMLRestorationError.predictionFailed(reason: error.localizedDescription)
         }
 
+        totalPredictionSeconds += ProcessInfo.processInfo.systemUptime - predictionStarted
+
         try checkCancellation()
         guard let output = prediction.featureValue(for: contract.output.name)?.multiArrayValue,
               output.shape.map(\.intValue) == contract.output.shape,
               output.dataType == contract.output.dataType else {
             throw CoreMLRestorationError.invalidOutputTensor
         }
-        guard Self.containsOnlyFiniteValues(output) else {
+        let validationStarted = ProcessInfo.processInfo.systemUptime
+        let finite = Self.containsOnlyFiniteValues(output)
+        totalValidationSeconds += ProcessInfo.processInfo.systemUptime - validationStarted
+        guard finite else {
             throw CoreMLRestorationError.nonFiniteOutput
         }
         return RestorationTileTensor(values: output)

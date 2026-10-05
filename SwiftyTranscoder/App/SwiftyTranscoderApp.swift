@@ -1,7 +1,6 @@
 import AppKit
 import SwiftUI
 
-@main
 struct SwiftyTranscoderApp: App {
     init() {
         if let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
@@ -21,6 +20,20 @@ struct SwiftyTranscoderApp: App {
                     SwiftyTranscoderAboutPanel.show()
                 }
             }
+        }
+    }
+}
+
+@main
+enum SwiftyTranscoderEntryPoint {
+    @MainActor
+    static func main() async {
+        let arguments = Array(CommandLine.arguments.dropFirst())
+        // Finder launches (including legacy -psn arguments) retain the GUI path.
+        if arguments.isEmpty || arguments.first?.hasPrefix("-psn_") == true {
+            SwiftyTranscoderApp.main()
+        } else {
+            exit(await CommandLineRunner.run(arguments))
         }
     }
 }

@@ -6,6 +6,10 @@ struct FullVideoRestorationControlsView: View {
     let canStart: Bool
     let disabledReason: String?
     let existingPartialOutput: URL?
+    var startButtonTitle = "Restore and Convert Approved Plan"
+    var supportsSavedProgress = true
+    @Binding var keepProgress: Bool
+    let savedJobDirectory: URL?
     let start: () -> Void
     @State private var partialPendingTrash: URL?
     @State private var trashError: String?
@@ -14,7 +18,8 @@ struct FullVideoRestorationControlsView: View {
         VStack(spacing: 8) {
             switch controller.phase {
             case .idle:
-                Button("Restore and Convert Approved Plan", systemImage: "sparkles.rectangle.stack", action: start)
+                if supportsSavedProgress { savedProgressControls }
+                Button(supportsSavedProgress && hasSavedJob && keepProgress ? "Resume Saved Restoration" : startButtonTitle, systemImage: "sparkles.rectangle.stack", action: start)
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
                     .disabled(!canStart)
@@ -42,6 +47,19 @@ struct FullVideoRestorationControlsView: View {
                 Text(output.path(percentEncoded: false))
                     .font(.caption)
                     .textSelection(.enabled)
+                if controller.reusedFrameCount > 0 {
+                    Text("Reused \(controller.reusedFrameCount) verified restored frames.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if let summary = controller.completionSummary {
+                    RestorationCompletionSummaryView(summary: summary)
+                    Text("Elapsed time and speed for newly restored frames include model preparation, audio, and saving.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if controller.completionSummary == nil, let seconds = controller.completionElapsedSeconds {
+                    Text("Elapsed: " + RestorationCompletionSummary.elapsedDescription(seconds))
+                        .font(.caption)
+                }
                 Button("Show in Finder", systemImage: "folder") {
                     NSWorkspace.shared.activateFileViewerSelecting([output])
                 }
@@ -96,6 +114,25 @@ struct FullVideoRestorationControlsView: View {
         }
     }
 
+    private var hasSavedJob: Bool {
+        savedJobDirectory.map { FileManager.default.fileExists(atPath: $0.path) } ?? false
+    }
+
+    private var savedProgressControls: some View {
+        VStack(spacing: 5) {
+            Toggle("Keep progress so this restoration can be resumed", isOn: $keepProgress)
+                .toggleStyle(.checkbox)
+            if keepProgress {
+                Text("Completed blocks are saved beside the output. Resume requires the same source, output, model, and settings. Saved blocks are removed after success.")
+                    .font(.caption).foregroundStyle(.secondary)
+                if hasSavedJob {
+                    Label("Saved restoration found", systemImage: "arrow.clockwise")
+                        .font(.caption)
+                }
+            }
+        }
+    }
+
     private func activeProgress(label: String) -> some View {
         VStack(spacing: 8) {
             HStack {
@@ -105,6 +142,10 @@ struct FullVideoRestorationControlsView: View {
                     .foregroundStyle(.secondary)
             }
             ProgressView(value: controller.progress)
+            if let seconds = controller.estimatedRemainingSeconds {
+                Text("About \(max(1, Int(ceil(seconds / 60))))m remaining")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Button("Cancel", role: .cancel) { controller.cancel() }
             if controller.isPreventingIdleSystemSleep {
                 Label("Keeping this Mac awake until restoration stops", systemImage: "moon.zzz")
@@ -148,6 +189,15 @@ struct FullVideoRestorationControlsView: View {
             Text(detail)
                 .font(.caption)
                 .textSelection(.enabled)
+            if supportsSavedProgress, keepProgress, hasSavedJob, let savedJobDirectory {
+                Text("Completed blocks retained: \(savedJobDirectory.path)")
+                    .font(.caption).textSelection(.enabled)
+                Button("Resume Saved Restoration", systemImage: "arrow.clockwise", action: start)
+                    .disabled(!canStart || partialOutput != nil)
+                Button("Show Saved Job in Finder", systemImage: "folder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([savedJobDirectory])
+                }
+            }
             if let partialOutput {
                 Button("Move Incomplete File to Trash", role: .destructive) {
                     partialPendingTrash = partialOutput

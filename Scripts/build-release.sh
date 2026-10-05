@@ -99,6 +99,8 @@ echo "Verifying SwiftyTranscoder ${version} (${build_number})…"
 
 mkdir -p "$staging_dir" "$dist_dir"
 ditto "$app_path" "$staging_dir/SwiftyTranscoder.app"
+ditto "$script_dir/swiftytranscoder" "$staging_dir/swiftytranscoder"
+ditto "$project_root/Documentation/CLI-Usage.txt" "$staging_dir/CLI-Usage.txt"
 ln -s /Applications "$staging_dir/Applications"
 
 echo "Creating ${dmg_name}…"
@@ -120,6 +122,11 @@ if [[ ! -L "$mount_dir/Applications" ]]; then
     exit 1
 fi
 "$script_dir/verify-release-app.sh" "$mount_dir/SwiftyTranscoder.app"
+if [[ ! -x "$mount_dir/swiftytranscoder" || ! -f "$mount_dir/CLI-Usage.txt" ]]; then
+    echo "The mounted DMG is missing its CLI launcher or instructions." >&2
+    exit 1
+fi
+SWIFTYTRANSCODER_APP="$mount_dir/SwiftyTranscoder.app" "$mount_dir/swiftytranscoder" --help | grep -q '^Usage: swiftytranscoder '
 hdiutil detach "$mount_dir" >/dev/null
 mounted=0
 

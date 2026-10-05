@@ -4,6 +4,12 @@ struct RestorationPlanChoiceView: View {
     let inspection: MediaInspection
     let plan: RestorationPlan
     @Binding var isEnabled: Bool
+    @Binding var method: RestorationMethod
+
+    private func modelIsAvailable(_ name: String) -> Bool {
+        FileManager.default.fileExists(atPath: Bundle.main.bundleURL
+            .appendingPathComponent("Contents/Resources/Models/\(name)").path)
+    }
 
     var body: some View {
         GroupBox {
@@ -17,6 +23,20 @@ struct RestorationPlanChoiceView: View {
                     .foregroundStyle(.secondary)
 
                 if isEnabled {
+                    if modelIsAvailable(FullVideoRestorationResources.fastModelName) || modelIsAvailable(FullVideoRestorationResources.lightweightModelName) {
+                        Picker("AI model", selection: $method) {
+                            Text("Detailed AI · Real-ESRGAN x2plus").tag(RestorationMethod.realESRGANX2Plus)
+                            if modelIsAvailable(FullVideoRestorationResources.lightweightModelName) {
+                                Text("Lightweight AI · FSRCNN (experimental)").tag(RestorationMethod.lightweightFSRCNN)
+                            }
+                            if modelIsAvailable(FullVideoRestorationResources.fastModelName) {
+                                Text("Faster AI · Compact model (experimental)").tag(RestorationMethod.compactGeneral)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        Text("Lightweight FSRCNN is fastest on the tested HD frames. Each model produces different detail and noise reduction. Review a short preview first.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 6) {
                         planRow("Method", plan.method.rawValue)
                         planRow(

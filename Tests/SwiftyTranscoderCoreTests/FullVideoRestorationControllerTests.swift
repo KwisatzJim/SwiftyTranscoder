@@ -4,12 +4,13 @@ import Testing
 
 @MainActor
 struct FullVideoRestorationControllerTests {
-    @Test func buildsApprovedRequestAndPublishesCompletion() async throws {
-        let pipeline = ControllerPipeline(mode: .complete)
+    @Test(arguments: [Int64(0), 120, 237]) func buildsApprovedRequestAndPublishesCompletion(savedFrames: Int64) async throws {
+        let clock = RestorationSummaryTestClock([100, 130])
+        let pipeline = ControllerPipeline(mode: .complete, savedFrames: savedFrames)
         let builder = RecordingRestorationBuilder(pipeline: pipeline)
         let controller = FullVideoRestorationController(
             pipelineBuilder: builder,
-            temporaryDirectory: URL(fileURLWithPath: "/private/tmp")
+            temporaryDirectory: URL(fileURLWithPath: "/private/tmp"), now: { clock.next() }
         )
         let sourceURL = URL(fileURLWithPath: "/private/tmp/source.m4v")
         let outputURL = URL(fileURLWithPath: "/private/tmp/restored.mp4")
@@ -31,12 +32,23 @@ struct FullVideoRestorationControllerTests {
         #expect(request.sourceURL == sourceURL)
         #expect(request.finalOutputURL == outputURL)
         #expect(request.totalFrameCount == 237)
+        #expect(controller.reusedFrameCount == savedFrames)
+        #expect(controller.completionElapsedSeconds == 30)
+        if savedFrames < 237 {
+            let summary = try #require(controller.completionSummary)
+            #expect(summary.elapsedSeconds == 30)
+            #expect(summary.frameCount == 237 - savedFrames)
+            #expect(summary.method == restorationPlan.method)
+            #expect(summary.averageFramesPerSecond == Double(237 - savedFrames) / 30)
+        } else { #expect(controller.completionSummary == nil) }
         #expect(request.subtitleStreamOrdinal == 1)
         #expect(request.expectedChapterCount == 1)
         #expect(request.expectedContainerTitle == "Example Episode")
         #expect(request.workspaceURL.lastPathComponent.hasPrefix(
             "SwiftyTranscoder-Restoration-Full-"
         ))
+        controller.reset()
+        #expect(controller.completionSummary == nil)
     }
 
     @Test func forwardsCancellationAndReportsPartialOutput() async throws {
@@ -67,6 +79,7 @@ struct FullVideoRestorationControllerTests {
 
         #expect(controller.phase == .cancelled(partialOutput: partialURL))
         #expect(await pipeline.wasCancelled)
+        #expect(controller.completionSummary == nil)
     }
 
     @Test func reportsFactoryFailureWithoutStartingPipeline() async throws {
@@ -210,13 +223,15 @@ private enum ControllerPipelineMode: Sendable {
 }
 
 private actor ControllerPipeline: FullVideoRestorationPipelineRunning {
+    private let savedFrames: Int64
     private let mode: ControllerPipelineMode
     private var state: FullVideoRestorationState = .idle
     private var progress = 0.0
     private var continuation: CheckedContinuation<FullVideoRestorationState, Never>?
     private(set) var wasCancelled = false
 
-    init(mode: ControllerPipelineMode) { self.mode = mode }
+    init(mode: ControllerPipelineMode, savedFrames: Int64 = 0) { self.mode = mode; self.savedFrames = savedFrames }
+    func savedFrameCountAtStart() -> Int64 { savedFrames }
 
     func run(_ request: FullVideoRestorationRequest) async -> FullVideoRestorationState {
         state = .running(.processingChunks)

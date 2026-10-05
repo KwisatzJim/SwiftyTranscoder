@@ -20,7 +20,9 @@ struct ContentView: View {
     }
 
     @StateObject private var conversionController = VideoConversionController()
+    @State private var keepRestorationProgress = false
     @StateObject private var restorationController = FullVideoRestorationController()
+    @StateObject private var restorationBatchController = RestorationBatchController()
     @State private var wizardStep = WizardStep.choose
     @State private var technicalDetailsExpanded = false
     @State private var isChoosingSource = false
@@ -44,6 +46,8 @@ struct ContentView: View {
     @State private var outputURL: URL?
     @State private var isRestorationPreviewActive = false
     @State private var restorationEnabled = false
+    @State private var restorationMethod: RestorationMethod = .realESRGANX2Plus
+    @AppStorage("preferredRestorationMethod") private var preferredRestorationMethod = RestorationMethod.realESRGANX2Plus.rawValue
     @AppStorage("savedOutputFolderPath") private var savedOutputFolderPath = ""
     @AppStorage("defaultGainEnabled") private var defaultGainEnabled = true
     @AppStorage("defaultAACStereoEnabled") private var defaultAACStereoEnabled = false
@@ -137,6 +141,9 @@ struct ContentView: View {
         }
         .onChange(of: conversionController.phase) { _, phase in
             handleConversionPhaseChange(phase)
+        }
+        .onChange(of: restorationBatchController.snapshot) { _, snapshot in
+            handleRestorationBatchChange(snapshot)
         }
     }
 
@@ -344,12 +351,23 @@ struct ContentView: View {
                     batchReadyView
                 }
 
-                if restorationEnabled, restorationPlan != nil {
+                if restorationBatchController.hasStarted || isBatchReady && batchContainsRestoration {
+                    RestorationBatchControlsView(
+                        controller: restorationBatchController,
+                        sources: sourceQueue,
+                        canStart: restorationBatchBlockingReason == nil,
+                        disabledReason: restorationBatchBlockingReason,
+                        start: beginApprovedBatch
+                    )
+                } else if restorationEnabled, restorationPlan != nil {
                     FullVideoRestorationControlsView(
                         controller: restorationController,
                         canStart: blockingReason == nil,
                         disabledReason: blockingReason,
                         existingPartialOutput: existingPartialOutput,
+                        supportsSavedProgress: sourceQueue.count == 1,
+                        keepProgress: $keepRestorationProgress,
+                        savedJobDirectory: savedRestorationDirectory,
                         start: { performPrimaryAction(sourceURL: selectedSource, inspection: inspection) }
                     )
                 } else {
@@ -424,7 +442,8 @@ struct ContentView: View {
                 HStack(spacing: 8) {
                     if approvedPlans[index] != nil
                         && !isBatchRunning
-                        && completedQueueIndexes.isEmpty {
+                        && completedQueueIndexes.isEmpty
+                        && !restorationBatchController.hasStarted {
                         Button {
                             selectApprovedPlan(at: index)
                         } label: {
@@ -447,7 +466,7 @@ struct ContentView: View {
                     .help("Remove \(source.lastPathComponent) from this batch")
                     .accessibilityLabel("Remove \(source.lastPathComponent) from batch")
                     .accessibilityHint("Asks for confirmation and does not delete the source file")
-                    .disabled(isBatchRunning || conversionController.isActive)
+                    .disabled(isBatchRunning || conversionController.isActive || restorationBatchController.hasStarted)
                 }
                 .id(index)
             }
@@ -455,7 +474,7 @@ struct ContentView: View {
     }
 
     private var queueHeading: String {
-        if isBatchRunning || !completedQueueIndexes.isEmpty {
+        if isBatchRunning || !completedQueueIndexes.isEmpty || restorationBatchController.hasStarted {
             return "Source queue · \(completedQueueCount) of \(sourceQueue.count) completed"
         }
         return "Source queue · \(approvedPlans.count) of \(sourceQueue.count) approved"
@@ -497,6 +516,17 @@ struct ContentView: View {
     }
 
     private func queueStatus(for index: Int) -> String {
+        if restorationBatchController.snapshot.items.indices.contains(index) {
+            switch restorationBatchController.snapshot.items[index] {
+            case .queued: return "Waiting"
+            case .preparing: return "Preparing"
+            case .running: return "Restoring"
+            case .completed: return "Completed"
+            case .failed: return "Failed"
+            case .cancelled: return "Cancelled"
+            case .notRun: return "Not run"
+            }
+        }
         if isCompletedQueueItem(index) { return "Completed" }
         if isBatchRunning && index == currentQueueIndex { return "Converting" }
         if !isBatchReady && index == currentQueueIndex { return "Reviewing" }
@@ -619,7 +649,14 @@ struct ContentView: View {
                 RestorationPlanChoiceView(
                     inspection: inspection,
                     plan: restorationPlan,
-                    isEnabled: $restorationEnabled
+                    isEnabled: $restorationEnabled,
+                    method: Binding(
+                        get: { restorationMethod },
+                        set: { method in
+                            restorationMethod = method
+                            preferredRestorationMethod = method.rawValue
+                        }
+                    )
                 )
                 .disabled(isBatchRunning || isBatchReady || isRestorationPreviewActive)
 
@@ -635,7 +672,7 @@ struct ContentView: View {
             }
 
             if showsApprovalAction {
-                if restorationEnabled {
+                if restorationEnabled && sourceQueue.count == 1 {
                     FullVideoRestorationControlsView(
                         controller: restorationController,
                         canStart: conversionBlockingReason == nil && !isRestorationPreviewActive,
@@ -643,6 +680,9 @@ struct ContentView: View {
                             ? "Cancel or finish the restoration preview before starting conversion."
                             : conversionBlockingReason,
                         existingPartialOutput: existingPartialOutput,
+                        supportsSavedProgress: sourceQueue.count == 1,
+                        keepProgress: $keepRestorationProgress,
+                        savedJobDirectory: savedRestorationDirectory,
                         start: { performPrimaryAction(sourceURL: sourceURL, inspection: inspection) }
                     )
                 } else {
@@ -680,6 +720,8 @@ struct ContentView: View {
                 return
             }
 
+            guard !restorationBatchController.isActive else { return }
+            restorationBatchController.reset()
             sourceQueue = supportedSources
             currentQueueIndex = 0
             approvedPlans = [:]
@@ -727,6 +769,10 @@ struct ContentView: View {
         GroupBox {
             VStack(alignment: .leading, spacing: 6) {
                 Text("All \(sourceQueue.count) conversion plans are approved. No encoding has started yet.")
+                if batchContainsRestoration {
+                    Text("AI restoration is enabled for \(approvedPlans.values.filter { $0.restorationPlan != nil }.count) of \(sourceQueue.count) videos.")
+                        .font(.caption)
+                }
                 Text("Select any queue row to review it. Start the batch when you are ready, or reopen the selected plan to change it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -788,6 +834,7 @@ struct ContentView: View {
         subtitleSelection = .needsChoice
         outputURL = nil
         restorationEnabled = false
+        restorationMethod = preferredModel
         if let savedFolder = validSavedOutputFolder {
             outputURL = OutputNaming.proposedURL(
                 sourceURL: source,
@@ -796,6 +843,10 @@ struct ContentView: View {
         }
         selectionError = nil
         inspect(source)
+    }
+
+    private var preferredModel: RestorationMethod {
+        RestorationMethod(rawValue: preferredRestorationMethod) ?? .realESRGANX2Plus
     }
 
     private var validSavedOutputFolder: URL? {
@@ -861,7 +912,7 @@ struct ContentView: View {
     }
 
     private func eligibleRestorationPlan(for inspection: MediaInspection) -> RestorationPlan? {
-        guard case .eligible(let plan) = RestorationPlanner().plan(for: inspection) else {
+        guard case .eligible(let plan) = RestorationPlanner().plan(for: inspection, method: restorationMethod) else {
             return nil
         }
         return plan
@@ -869,9 +920,6 @@ struct ContentView: View {
 
     private func restorationConversionBlockingReason(inspection: MediaInspection) -> String? {
         guard !restorationController.isActive else { return nil }
-        guard sourceQueue.count == 1 else {
-            return "Full-video AI restoration is currently available for one video at a time."
-        }
         guard let plan = eligibleRestorationPlan(for: inspection) else {
             return "This video is not eligible for the reviewed AI restoration plan."
         }
@@ -886,7 +934,10 @@ struct ContentView: View {
               ) else {
             return "AI restoration requires valid source duration and size metadata."
         }
-        if let available = try? FileManager.default.temporaryDirectory.resourceValues(
+        let restorationVolume = keepRestorationProgress && sourceQueue.count == 1
+            ? (savedRestorationDirectory?.deletingLastPathComponent() ?? FileManager.default.temporaryDirectory)
+            : FileManager.default.temporaryDirectory
+        if let available = try? restorationVolume.resourceValues(
             forKeys: [.volumeAvailableCapacityForImportantUsageKey]
         ).volumeAvailableCapacityForImportantUsage,
            available < requirement.temporaryBytes {
@@ -932,6 +983,13 @@ struct ContentView: View {
         }
     }
 
+    private var savedRestorationDirectory: URL? {
+        guard let outputURL else { return nil }
+        return outputURL.deletingLastPathComponent().appendingPathComponent(
+            "SwiftyTranscoder-Restoration-" + outputURL.lastPathComponent, isDirectory: true
+        )
+    }
+
     private func startFullVideoRestoration(sourceURL: URL, inspection: MediaInspection) {
         guard let outputURL,
               let plan = eligibleRestorationPlan(for: inspection) else {
@@ -945,7 +1003,11 @@ struct ContentView: View {
             plan: plan,
             gainEnabled: gainEnabled,
             aacStereoEnabled: aacStereoEnabled,
-            subtitleSelection: subtitleSelection
+            subtitleSelection: subtitleSelection,
+            checkpointDirectory: keepRestorationProgress ? savedRestorationDirectory : nil,
+            checkpointMode: keepRestorationProgress
+                ? (savedRestorationDirectory.map { FileManager.default.fileExists(atPath: $0.path) } == true ? .resume : .create)
+                : nil
         )
     }
 
@@ -978,7 +1040,8 @@ struct ContentView: View {
                 gainEnabled: gainEnabled,
                 aacStereoEnabled: aacStereoEnabled,
                 colorSelection: colorSelection,
-                subtitleSelection: subtitleSelection
+                subtitleSelection: subtitleSelection,
+                restorationPlan: restorationEnabled ? eligibleRestorationPlan(for: inspection) : nil
             )
 
             if approvedPlans.count == sourceQueue.count {
@@ -1022,7 +1085,8 @@ struct ContentView: View {
         aacStereoEnabled = approved.aacStereoEnabled
         colorSelection = approved.colorSelection
         subtitleSelection = approved.subtitleSelection
-        restorationEnabled = false
+        restorationEnabled = approved.restorationPlan != nil
+        restorationMethod = approved.restorationPlan?.method ?? preferredModel
     }
 
     private func performPrimaryAction(sourceURL: URL, inspection: MediaInspection) {
@@ -1033,7 +1097,37 @@ struct ContentView: View {
         }
     }
 
+    private var batchContainsRestoration: Bool {
+        approvedPlans.values.contains { $0.restorationPlan != nil }
+    }
+
+    private var restorationBatchBlockingReason: String? {
+        guard approvedPlans.count == sourceQueue.count else { return "Approve every plan before starting." }
+        guard approvedPlans.values.allSatisfy({ $0.restorationPlan != nil }) else {
+            return "Enable AI restoration for every video in this batch, or use a separate batch for ordinary conversion."
+        }
+        guard batchHasSufficientSpace else { return "Destination space is insufficient or could not be checked." }
+        guard duplicateBatchOutputURLs.isEmpty else { return "Choose a unique output filename for every video." }
+        return nil
+    }
+
     private func beginApprovedBatch() {
+        if batchContainsRestoration {
+            if let reason = restorationBatchBlockingReason { selectionError = reason; return }
+            let jobs = sourceQueue.indices.compactMap { index -> ReviewedRestorationJob? in
+                guard let approved = approvedPlans[index], let plan = approved.restorationPlan else { return nil }
+                return ReviewedRestorationJob(
+                    sourceURL: approved.sourceURL, inspection: approved.inspection, outputURL: approved.outputURL,
+                    plan: plan, gainEnabled: approved.gainEnabled, aacStereoEnabled: approved.aacStereoEnabled,
+                    subtitleSelection: approved.subtitleSelection
+                )
+            }
+            completedQueueIndexes = []
+            isBatchReady = false
+            restorationBatchController.start(jobs)
+            isBatchRunning = restorationBatchController.isActive
+            return
+        }
         guard approvedPlans.count == sourceQueue.count else {
             selectionError = "Every queued video must have an approved plan before the batch can start."
             return
@@ -1135,7 +1229,7 @@ struct ContentView: View {
     }
 
     private func handleConversionPhaseChange(_ phase: VideoConversionController.Phase) {
-        guard isBatchRunning else { return }
+        guard isBatchRunning, !restorationBatchController.hasStarted else { return }
         switch phase {
         case .completed:
             completedQueueIndexes.insert(currentQueueIndex)
@@ -1166,6 +1260,29 @@ struct ContentView: View {
             )
         default:
             break
+        }
+    }
+
+    private func handleRestorationBatchChange(_ snapshot: RestorationBatchSnapshot) {
+        completedQueueIndexes = Set(snapshot.items.indices.filter {
+            if case .completed = snapshot.items[$0] { return true }
+            return false
+        })
+        if let index = snapshot.activeIndex, let approved = approvedPlans[index] {
+            currentQueueIndex = index
+            restoreApprovedPlan(approved)
+        }
+        isBatchRunning = restorationBatchController.isActive
+        switch snapshot.phase {
+        case .finished:
+            sendBatchNotification(title: "SwiftyTranscoder Restoration Batch Finished",
+                                  body: "Completed \(completedQueueIndexes.count) of \(sourceQueue.count) videos. Review the per-file results.")
+        case .cancelled:
+            sendBatchNotification(title: "SwiftyTranscoder Restoration Batch Cancelled",
+                                  body: "Completed \(completedQueueIndexes.count) videos; remaining jobs were stopped.")
+        case .rejected(let message):
+            sendBatchNotification(title: "SwiftyTranscoder Restoration Batch Stopped", body: message)
+        default: break
         }
     }
 
@@ -1208,6 +1325,7 @@ private struct ApprovedConversion {
     let aacStereoEnabled: Bool
     let colorSelection: ColorSelection
     let subtitleSelection: SubtitleSelection
+    let restorationPlan: RestorationPlan?
 }
 
 private struct BatchDestinationSpaceCheck: Identifiable {

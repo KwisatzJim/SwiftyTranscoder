@@ -14,7 +14,22 @@ struct RestorationStorageRequirementTests {
         #expect(estimate.frameCount == 64_736)
         #expect(estimate.chunkCount == 540)
         #expect(estimate.maximumResidentFrameCount == 120)
-        #expect(estimate.temporaryBytes == 5_600_897_024)
+        #expect(estimate.temporaryBytes == 5_601_327_224)
+    }
+
+    @Test func accountsForFullDoubleSizeFramesBeforeHDOutputCap() throws {
+        let plan = RestorationPlan(
+            method: .lightweightFSRCNN, sourceWidth: 1280, sourceHeight: 720,
+            outputWidth: 1920, outputHeight: 1080, frameRate: "24/1",
+            colorRange: "tv", colorSpace: "bt709", colorTransfer: "bt709", colorPrimaries: "bt709"
+        )
+        let estimate = try #require(RestorationStorageRequirement.estimate(
+            sourceBytes: 0, durationSeconds: 10, frameRate: "24/1", plan: plan
+        ))
+        let source = try #require(RestorationPNGEncoder.maximumFileBytes(width: 1280, height: 720))
+        let restored = try #require(RestorationPNGEncoder.maximumFileBytes(width: 2560, height: 1440))
+        #expect(estimate.temporaryBytes == (source + 1024 + restored) * 120 + RestorationStorageRequirement.reserveBytes)
+        #expect(estimate.temporaryBytes > 3_200_000_000)
     }
 
     @Test func rejectsInvalidAndOverflowingInputs() {

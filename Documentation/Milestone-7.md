@@ -90,7 +90,7 @@ The Debug application build succeeded. Runtime conversion and sync/playback chec
 
 The user completed the integrated no-gain conversion and confirmed that the resulting file looks and plays well, with audio synchronized correctly:
 
-`/Volumes/myMedia/programming_projects/SwiftyTranscoder/Reacher - s04e08 - Cut.mp4`
+`/path/to/SwiftyTranscoder/Reacher - s04e08 - Cut.mp4`
 
 Direct filesystem inspection confirmed that the intermediate `.partial.mp4` no longer exists; only the promoted final output remains. Independent `ffprobe` inspection confirmed:
 

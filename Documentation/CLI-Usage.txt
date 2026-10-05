@@ -1,0 +1,49 @@
+SwiftyTranscoder command-line interface
+
+1. Install SwiftyTranscoder.app in /Applications using the DMG shortcut.
+2. Copy the swiftytranscoder launcher from this DMG to a permanent folder.
+   Run it using that full path, or place the folder on your shell's PATH.
+   For example, if ~/bin is already on your PATH, copy the launcher there.
+   You do not need to keep this DMG mounted or retain the source checkout.
+
+Examples (assuming the launcher is on PATH):
+
+swiftytranscoder --help
+swiftytranscoder "/path/to/input.mkv" --preset plex --output "/path/to/output.mp4"
+swiftytranscoder "/path/to/input.mp4" --preset plex --gain-db 6 --output "/path/to/output.mp4"
+
+Use --dry-run to inspect without writing output.
+Plex defaults: protected +6 dB gain, primary AC-3, secondary AAC stereo.
+Use --gain-db 0 for already-boosted files to avoid applying gain twice.
+MP4/M4V processing copies compatible video unchanged and re-encodes audio.
+Subtitle-bearing inputs require --subtitles omit or --subtitles INDEX.
+Untagged MKV SDR needs --assume-bt709 after confirming its color.
+Existing destinations and partial files are refused; output must end in .mp4.
+Ctrl-C cancels and retains a labeled partial file when one exists.
+Exit codes: 0 success, 1 processing failure, 2 usage error, 130 cancelled.
+Lightweight AI restoration (1.4.0 and later):
+swiftytranscoder "/path/to/input.m4v" --restore lightweight --output "/path/to/restored.mp4"
+Add --dry-run first to review the AI model and approved output dimensions.
+Restoration requires eligible, explicitly tagged SDR H.264/HEVC below 1080p.
+It uses the GUI's full-restoration pipeline and caps the output at 1080p.
+The same gain, AAC, subtitle, output validation, and cancellation rules apply.
+Without --restore, ordinary conversion behavior is unchanged.
+The CLI model selection is explicit; it does not use the saved GUI preference.
+
+The launcher defaults to /Applications/SwiftyTranscoder.app.
+For another app location, set SWIFTYTRANSCODER_APP to the full bundle path.
+The previous 1.1.0 release does not implement CLI arguments.
+
+Resumable AI restoration (1.5.0 and later):
+swiftytranscoder "/path/to/input.m4v" --restore lightweight --output "/path/to/restored.mp4" --checkpoint-dir "/path/to/SwiftyTranscoder-Restoration-Pilot"
+Use a new folder whose parent already exists; the app creates the job folder.
+After Ctrl-C or a force quit, repeat exactly that command and add --resume.
+Add --resume --dry-run to verify source/settings and completed blocks without writing.
+The folder must start with SwiftyTranscoder-Restoration- and must survive reboot
+(use a permanent folder rather than /tmp). Completed 120-frame blocks are retained;
+an interrupted block is processed again. Finished jobs remove their saved folder.
+Another active run, altered source/model/settings, or altered saved blocks are refused.
+Existing final and destination partial files remain protected against replacement.
+Average speed counts newly processed frames; resumed elapsed time covers this run.
+The GUI offers the same opt-in behavior for a single file through Keep progress,
+with a saved job folder beside the chosen output. Batch resume is not exposed yet.

@@ -15,6 +15,7 @@ struct RestorationAudioMuxerTests {
         #expect(arguments.contains("-map_metadata"))
         #expect(arguments.contains("-1"))
         #expect(arguments.contains("copy"))
+        #expect(arguments.contains("-shortest"))
         #expect(fixture.request.outputURL.lastPathComponent == "restored-preview.partial.mp4")
     }
 
@@ -69,6 +70,7 @@ struct RestorationAudioMuxerTests {
         let output = try await muxer.mux(fixture.request)
 
         #expect(fixture.request.scope == .fullDuration)
+        #expect(!fixture.request.ffmpegArguments.contains("-shortest"))
         #expect(fixture.request.startSeconds == 0)
         #expect(fixture.request.ffmpegArguments.contains("120.000000"))
         #expect(output.lastPathComponent == "restored-audio.partial.mp4")

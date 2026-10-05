@@ -83,6 +83,7 @@ protocol RestorationChunkCoordinating: Sendable {
 }
 
 actor RestorationChunkCoordinator {
+    private let checkpointSession: RestorationCheckpointSession?
     private let processor: any RestorationChunkProcessing
     private var cancellationRequested = false
     private var hasStarted = false
@@ -90,7 +91,8 @@ actor RestorationChunkCoordinator {
     private(set) var completedChunkCount = 0
     private(set) var progress = 0.0
 
-    init(processor: any RestorationChunkProcessing) {
+    init(processor: any RestorationChunkProcessing, checkpointSession: RestorationCheckpointSession? = nil) {
+        self.checkpointSession = checkpointSession
         self.processor = processor
     }
 
@@ -100,20 +102,23 @@ actor RestorationChunkCoordinator {
         totalChunkCount = plan.chunks.count
         cancellationRequested = false
         progress = 0
-        var segments: [URL] = []
+        var segments = await checkpointSession?.savedSegmentURLs() ?? []
+        completedChunkCount = segments.count
+        progress = Double(completedChunkCount) / Double(plan.chunks.count)
 
         do {
-            for chunk in plan.chunks {
+            for chunk in plan.chunks.dropFirst(completedChunkCount) {
                 try checkCancellation()
                 let segment = try await processor.process(chunk)
                 guard !segment.path.hasPrefix(chunk.workspaceURL.path + "/") else {
                     throw RestorationChunkError.segmentInsideDisposableWorkspace
                 }
-                try checkCancellation()
+                if let checkpointSession { try await checkpointSession.record(chunk) }
                 try removeChunkWorkspace(chunk.workspaceURL)
                 segments.append(segment)
                 completedChunkCount += 1
                 progress = Double(completedChunkCount) / Double(plan.chunks.count)
+                try checkCancellation()
             }
             return segments
         } catch {

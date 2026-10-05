@@ -2,6 +2,29 @@
 
 SwiftyTranscoder is a native macOS SwiftUI application for turning MKV and compatible MP4 sources into understandable, Plex-friendly MP4 files. It inspects every source first, explains every automatic choice, and uses Apple VideoToolbox hardware encoding for HEVC output.
 
+## Download and install
+
+Download **SwiftyTranscoder_1.5.0_arm64.dmg** from [the latest release](https://github.com/KwisatzJim/SwiftyTranscoder/releases/latest), open it, and drag the app to **Applications**. Requires an Apple Silicon Mac running macOS 14 or later.
+
+This personal release is signed locally and is not Apple-notarized. If macOS blocks the first launch, use **System Settings → Privacy & Security → Open Anyway** after confirming the download came from this repository. The release includes a SHA-256 checksum, its CLI launcher, and usage instructions. FFmpeg and the AI models are bundled; Python and Homebrew are not required to run the app.
+
+## Command-line interface
+
+Launching the app normally opens the graphical interface. The DMG includes the `swiftytranscoder` launcher and `CLI-Usage.txt`. After installing the app in `/Applications`, copy the launcher to a permanent folder and run it by path or add that folder to your shell's `PATH`. `Scripts/swiftytranscoder` is the equivalent source-checkout launcher; set `SWIFTYTRANSCODER_APP` to the development bundle while testing:
+
+```sh
+export SWIFTYTRANSCODER_APP="$PWD/.build/Milestone101DerivedData/Build/Products/Debug/SwiftyTranscoder.app"
+Scripts/swiftytranscoder --help
+Scripts/swiftytranscoder "/path/to/input.mkv" --preset plex --output "/path/to/output.mp4"
+Scripts/swiftytranscoder "/path/to/input.mp4" --preset plex --gain-db 6 --output "/path/to/output.mp4"
+```
+
+The Plex preset defaults to protected +6 dB gain, primary AC-3, and secondary AAC stereo. `--gain-db 0` disables gain; `--aac-stereo off` disables the secondary track. Compatible SDR H.264/HEVC MP4/M4V inputs copy video unchanged while re-encoding audio. Reprocessing an already boosted file applies gain again, so use the original when gain is wanted only once.
+
+Use `--dry-run` to inspect and print the plan without creating output. Sources containing subtitle streams require an explicit `--subtitles omit` or `--subtitles INDEX` choice using a source stream index; burn-in accepts SubRip on MKV only. Untagged MKV video requires `--assume-bt709` only after confirming it is SDR. Existing files are refused, output validation precedes final promotion, and Ctrl-C retains any partial output. Exit codes are 0 for success, 1 for processing failure, 2 for usage errors, and 130 for cancellation. Use `--restore lightweight` for explicit AI restoration, and `--checkpoint-dir PATH` with `--resume` for saved jobs. See [CLI usage](Documentation/CLI-Usage.txt).
+
+The launcher defaults to `/Applications/SwiftyTranscoder.app` when the override is absent. Do not target the older 1.1.0 bundle for CLI use. Packaging does not install the app, modify your shell settings, or install a system command automatically.
+
 The source MKV is always read-only. Conversion is written to a clearly named `.partial.mp4`, independently validated, and only then promoted to the final `.mp4` filename.
 
 ## Current capabilities
@@ -24,7 +47,9 @@ The source MKV is always read-only. Conversion is written to a clearly named `.p
 - Remove an unwanted source from a batch before encoding without deleting its file or discarding the other approved plans.
 - Refuse to overwrite existing output, verify aggregate destination free space, and block duplicate output paths before a batch starts.
 - Validate video profile, pixel format, color metadata, dimensions, frame rate, audio format, channel layout, bitrate, duration, and subtitle policy before completing a file.
-- Version 1.1 offers optional local Real-ESRGAN restoration for one eligible 8-bit SDR source at a time, with short previews, bounded temporary storage, and validated audio/subtitle integration. Restoration stays off by default; 624×352 sources use the reviewed faster model.
+- Optional local AI restoration using Lightweight FSRCNN, compact Real-ESRGAN, or detailed Real-ESRGAN, with short previews, a 1080p output cap, sequential batches, and validated audio/subtitle integration.
+- Opt-in single-video resume preserves verified completed blocks after cancellation or a force quit; it is available in the GUI and CLI.
+- Restoration progress, measured remaining-time estimates, elapsed time, and average speed. AI remains off by default.
 
 ## Requirements
 
@@ -37,7 +62,7 @@ Release application builds contain their own checksum-pinned FFmpeg 9.0.2 tools.
 
 ## Build and run
 
-1. Prepare the pinned self-contained tools with `Scripts/build-toolchain.sh` and `Scripts/stage-toolchain-bundle.sh`, then prepare the verified restoration model with `Scripts/prepare-restoration-model.sh`.
+1. Follow [Building from source](Documentation/Building.md) to prepare the media tools and all four checksum-verified model packages.
 2. Open `SwiftyTranscoder.xcodeproj` in Xcode.
 3. Select the **SwiftyTranscoder** scheme and **My Mac** as the destination.
 4. Press **Run** (`Command-R`).
@@ -54,20 +79,28 @@ xcodebuild \
   build
 ```
 
-Run the Foundation-only media-decision and queue-safety regression tests with:
+Run the Swift regression tests with:
 
 ```fish
 swift test
 ```
 
-## Local 1.1 release
+## Local releases
+
+The personal arm64 `1.4.0 (14)` release adds restoration completion statistics, a remembered AI model preference, and explicit `--restore lightweight` CLI restoration with dry-run planning, progress, cancellation, and validated output. These features passed their focused user checkpoints. Its artifact is `dist/SwiftyTranscoder_1.4.0_arm64.dmg`; earlier releases remain available.
+
+The personal arm64 `1.5.0 (15)` release adds accepted opt-in single-video resume and CLI saved jobs. Completed blocks survive interruption and are verified before reuse; resumed elapsed time, speed, and remaining-time estimates count new work appropriately. Its artifact is `dist/SwiftyTranscoder_1.5.0_arm64.dmg`. The existing CLI launcher uses the updated app after installation.
+
+The personal arm64 `1.3.0 (13)` release adds reviewed restoration batches, numeric progress and current-video time estimates, selectable Lightweight FSRCNN and Compact Real-ESRGAN models, corrected capped-HD assembly, and faster lossless temporary PNG writing. The user accepted a full Pilot run (107 minutes) and a two-file Original Sin batch (50 minutes), including playback. These observations apply to the tested sources on the M6 Mac mini. All four model resources and their licenses are bundled and checksum verified. Its artifact is `dist/SwiftyTranscoder_1.3.0_arm64.dmg`; older installers remain available.
+
+The personal arm64 `1.2.0 (12)` release includes the CLI, responsive preview model preparation, source-specific SD model loading, and scoped cleanup of temporary image/model objects. Benchmarks on the M6 Mac mini reduced SD model setup from approximately 28.6 to 13.3 seconds and held live process memory near 141 MiB during a 120-frame SD sample, with essentially unchanged restoration speed. These are short benchmark results, not an episode-length memory guarantee. Its artifact is `dist/SwiftyTranscoder_1.2.0_arm64.dmg`; it retains the same local ad-hoc signing policy and checksum-pinned resources. Older DMGs remain available.
 
 The personal, arm64 `1.1.0` release adds optional single-video local AI restoration, folder import, Finder drag and drop, and saved AAC stereo defaults. Its artifact is `dist/SwiftyTranscoder_1.1.0_arm64.dmg`, with its SHA-256 checksum in `dist/SHA256SUMS.txt`. It contains its own checksum-pinned FFmpeg, FFprobe, and restoration models. It is ad-hoc signed for local use, not Developer ID signed or notarized. The previous 1.0 DMG is retained.
 
 Create a verified local release from the repository root with:
 
 ```fish
-Scripts/build-release.sh
+env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer Scripts/build-release.sh
 ```
 
 The script runs the regression suite, rebuilds the pinned toolchain, verifies the signed application, creates and verifies the DMG, mounts it read-only, and repeats the app checks from the packaged copy. It refuses to replace an existing DMG for the current version. To deliberately rebuild and replace that artifact, use `Scripts/build-release.sh --force`.
@@ -122,7 +155,7 @@ Use **Choose Folder…** to load the MKV, MP4, and M4V files directly inside a f
 - Selectable MP4 subtitle output is not implemented; supported subtitles are either burned in or omitted.
 - MP4/M4V audio-only processing cannot burn subtitles because that would require video re-encoding.
 - Every queued plan must be reviewed and approved before unattended batch conversion begins. A failure or cancellation stops the batch.
-- Automatic crop detection and broad encoder controls remain deferred. Optional restoration and AI upscaling are available in 1.1, not in the older 1.0 release. Batch restoration is not supported; ordinary batch conversion remains available.
+- Automatic crop detection and broad encoder controls remain deferred. Optional restoration and AI upscaling are available in 1.1, not in the older 1.0 release. The 1.2.0 release supports ordinary batch conversion; 1.3.0 adds accepted restoration-only batches (see `Documentation/Milestone-113.md`).
 - Likely-forced analysis depends on trustworthy Matroska subtitle statistics. Missing, malformed, lone, or ambiguous statistical evidence produces no recommendation.
 - The current personal release is arm64 and ad-hoc signed; it is not a Developer ID signed or notarized public distribution.
 
@@ -156,3 +189,19 @@ Detailed implementation and test evidence is recorded in `Documentation/`.
 - `SwiftyTranscoder/Services` — `ffprobe`, FFmpeg command construction, progress, cancellation, and output validation
 - `SwiftyTranscoder/Views` — native SwiftUI workflow and technical details
 - `Documentation` — milestone decisions and runtime validation evidence
+
+
+Resumable AI restoration is available in 1.5.0. For a
+single video, enable **Keep progress so this restoration can be resumed** before
+starting. Completed blocks are saved beside the output and survive cancellation
+or a force quit. Reopen the same source/output/settings, enable the option, and
+choose **Resume Saved Restoration**. The source, actual model/helper version,
+settings, and saved block contents are verified before reuse. Completed jobs
+remove the saved folder. The CLI exposes `--checkpoint-dir PATH` and `--resume`;
+see `Documentation/CLI-Usage.txt`. Ordinary conversions, previews, and restoration
+batches retain their existing behavior. The user accepted resumed playback and the interface. Version 1.5.0 packages
+these changes; batch resume remains a later enhancement.
+
+## License
+
+Original SwiftyTranscoder code is available under the [MIT license](LICENSE). Bundled third-party software and AI models keep their own licenses; see [Third-party components](Documentation/ThirdPartyComponents.md). Release downloads include component source archives and notices as well as the installer.

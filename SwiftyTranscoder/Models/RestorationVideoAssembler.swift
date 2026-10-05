@@ -82,7 +82,12 @@ struct RestorationVideoAssembly: Equatable, Sendable {
     }
 
     var ffmpegArguments: [String] {
-        var filters = subtitleBurn.map { [$0.filter] } ?? []
+        // The model always restores at 2×; the approved plan may cap that at 1080p.
+        var filters: [String] = []
+        if plan.outputWidth != plan.sourceWidth * 2 || plan.outputHeight != plan.sourceHeight * 2 {
+            filters.append("scale=\(plan.outputWidth):\(plan.outputHeight):flags=lanczos")
+        }
+        filters += subtitleBurn.map { [$0.filter] } ?? []
         filters.append("setparams=range=limited:color_primaries=\(plan.colorPrimaries):color_trc=\(plan.colorTransfer):colorspace=\(plan.colorSpace)")
         return [
             "-hide_banner", "-nostdin", "-n", "-loglevel", "error",

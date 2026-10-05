@@ -1,6 +1,7 @@
 import Foundation
 
 struct FullVideoRestorationRequest: Sendable {
+    let checkpointMode: RestorationCheckpointMode?
     let sourceURL: URL
     let workspaceURL: URL
     let finalOutputURL: URL
@@ -26,7 +27,8 @@ struct FullVideoRestorationRequest: Sendable {
         aacStereoEnabled: Bool,
         subtitleStreamOrdinal: Int? = nil,
         expectedChapterCount: Int,
-        expectedContainerTitle: String?
+        expectedContainerTitle: String?,
+        checkpointMode: RestorationCheckpointMode? = nil
     ) throws {
         guard workspaceURL.lastPathComponent.hasPrefix("SwiftyTranscoder-Restoration-") else {
             throw FullVideoRestorationError.invalidWorkspaceName
@@ -57,6 +59,7 @@ struct FullVideoRestorationRequest: Sendable {
             finalOutputURL: finalOutputURL
         )
 
+        self.checkpointMode = checkpointMode
         self.sourceURL = sourceURL
         self.workspaceURL = workspaceURL
         self.finalOutputURL = finalOutputURL
@@ -101,9 +104,17 @@ protocol FullVideoRestorationPipelineRunning: Sendable {
     func cancel() async
     func currentProgress() async -> Double
     func currentState() async -> FullVideoRestorationState
+    func savedFrameCountAtStart() async -> Int64
+}
+
+extension FullVideoRestorationPipelineRunning {
+    func savedFrameCountAtStart() async -> Int64 { 0 }
 }
 
 actor FullVideoRestorationPipeline: FullVideoRestorationPipelineRunning {
+    private let checkpointSession: RestorationCheckpointSession?
+    private var ownsWorkspace = false
+    private var hasStarted = false
     private let chunkCoordinator: any RestorationChunkCoordinating
     private let segmentConcatenator: any RestorationSegmentConcatenating
     private let audioMuxer: any RestorationAudioMuxing
@@ -116,8 +127,10 @@ actor FullVideoRestorationPipeline: FullVideoRestorationPipelineRunning {
         chunkCoordinator: any RestorationChunkCoordinating,
         segmentConcatenator: any RestorationSegmentConcatenating,
         audioMuxer: any RestorationAudioMuxing,
-        outputPromoter: any RestorationOutputPromoting
+        outputPromoter: any RestorationOutputPromoting,
+        checkpointSession: RestorationCheckpointSession? = nil
     ) {
+        self.checkpointSession = checkpointSession
         self.chunkCoordinator = chunkCoordinator
         self.segmentConcatenator = segmentConcatenator
         self.audioMuxer = audioMuxer
@@ -125,14 +138,18 @@ actor FullVideoRestorationPipeline: FullVideoRestorationPipelineRunning {
     }
 
     func run(_ request: FullVideoRestorationRequest) async -> FullVideoRestorationState {
-        guard !isActive else {
-            return .failed("A full-video restoration is already running.", partialOutput: nil)
+        guard !isActive, !hasStarted else {
+            return .failed("This full-video restoration pipeline has already started.", partialOutput: nil)
         }
+        hasStarted = true
         cancellationRequested = false
         progress = 0
+        state = .running(.processingChunks)
 
         do {
             try prepare(request)
+            if let checkpointSession { try await checkpointSession.prepare() }
+            try checkCancellation()
             let chunkPlan = try RestorationChunkPlan(
                 totalFrameCount: request.totalFrameCount,
                 frameRate: request.plan.frameRate,
@@ -215,10 +232,12 @@ actor FullVideoRestorationPipeline: FullVideoRestorationPipelineRunning {
             state = .running(.promotingDestination)
             let output = try await outputPromoter.promote(promotion)
             progress = 1
-            try? removeOwnedWorkspace(request.workspaceURL)
+            if let checkpointSession { await checkpointSession.finish(success: true) }
+            else if ownsWorkspace { try? removeOwnedWorkspace(request.workspaceURL) }
             state = .completed(output: output)
         } catch {
-            try? removeOwnedWorkspace(request.workspaceURL)
+            if let checkpointSession { await checkpointSession.finish(success: false) }
+            else if ownsWorkspace { try? removeOwnedWorkspace(request.workspaceURL) }
             let partial = existingPartialOutput(request.partialOutputURL)
             if cancellationRequested || error is CancellationError {
                 state = .cancelled(partialOutput: partial)
@@ -241,6 +260,8 @@ actor FullVideoRestorationPipeline: FullVideoRestorationPipelineRunning {
         }
     }
 
+    func savedFrameCountAtStart() async -> Int64 { await checkpointSession?.savedFrameCountAtStart() ?? 0 }
+
     func currentProgress() -> Double { progress }
     func currentState() -> FullVideoRestorationState { state }
 
@@ -256,7 +277,7 @@ actor FullVideoRestorationPipeline: FullVideoRestorationPipelineRunning {
         guard fileManager.fileExists(atPath: request.sourceURL.path) else {
             throw FullVideoRestorationError.sourceMissing
         }
-        guard !fileManager.fileExists(atPath: request.workspaceURL.path) else {
+        guard checkpointSession != nil || !fileManager.fileExists(atPath: request.workspaceURL.path) else {
             throw FullVideoRestorationError.workspaceExists
         }
         guard !fileManager.fileExists(atPath: request.finalOutputURL.path) else {
@@ -273,7 +294,10 @@ actor FullVideoRestorationPipeline: FullVideoRestorationPipelineRunning {
         ), isDirectory.boolValue else {
             throw FullVideoRestorationError.destinationFolderMissing
         }
-        try fileManager.createDirectory(at: request.workspaceURL, withIntermediateDirectories: true)
+        if checkpointSession == nil {
+            try fileManager.createDirectory(at: request.workspaceURL, withIntermediateDirectories: true)
+            ownsWorkspace = true
+        }
     }
 
     private func monitorProgress(
