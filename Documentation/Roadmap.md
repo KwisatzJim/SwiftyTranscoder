@@ -119,3 +119,8 @@ The development app exposes opt-in saved progress beside the output and a Resume
 ## 122 — Local 1.5.0 release
 
 After the user accepted resumed playback and the single-video interface, version 1.5.0 (15) was packaged. All 165 tests, toolchain/model/resource/signature checks, DMG integrity, ordinary packaged CLI conversions/cancellation, and packaged Ctrl-C/force-quit/all-blocks resume checks passed. All completed outputs retain 240 frames and AC-3/AAC audio; saved blocks were reused unchanged and saved workspaces cleaned after success. Earlier installer checksums remain valid. The user confirmed installed 1.5.0 acceptance; this local release milestone is complete. See `Milestone-122.md`.
+
+
+## 123 — Public GitHub repository and 1.5.0 release
+
+The user authorized the public `KwisatzJim/SwiftyTranscoder` repository and MIT license for original code. Source and the `v1.5.0` tag are published, with the accepted installer, third-party component source bundle, and checksums attached to the GitHub Release. A clean source build passed, build/download instructions are current, and GitHub asset digests/sizes match local verified files. Publication is complete. See `Milestone-123.md`.
