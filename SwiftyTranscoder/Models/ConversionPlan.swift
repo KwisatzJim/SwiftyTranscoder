@@ -20,6 +20,7 @@ struct ConversionPlan: Sendable {
         inspection: MediaInspection,
         gainEnabled: Bool = true,
         aacStereoEnabled: Bool = false,
+        audioMode: ConversionAudioMode = .convert,
         colorSelection: ColorSelection,
         subtitleSelection: SubtitleSelection,
         restorationPlan: RestorationPlan? = nil,
@@ -46,7 +47,7 @@ struct ConversionPlan: Sendable {
             .flatMap(CompatibilityAudioSettings.init(source:))
             .map { "AC-3 \($0.description), 48 kHz; preserve channel layout" }
             ?? "Unsupported audio layout—conversion blocked"
-        audioFormat = aacStereoEnabled
+        audioFormat = audioMode == .omit ? "Remove all audio tracks (video only)" : aacStereoEnabled
             ? "\(primaryAudioFormat); plus AAC stereo at 192 kb/s"
             : primaryAudioFormat
         subtitleAction = SubtitlePlanAction(
@@ -54,7 +55,7 @@ struct ConversionPlan: Sendable {
             streams: inspection.subtitleStreams,
             recommendation: summary.subtitleRecommendation
         )
-        audioGain = gainEnabled ? "+6 dB with peak protection" : "Off"
+        audioGain = audioMode == .omit ? "Not applied—audio removed" : gainEnabled ? "+6 dB with peak protection" : "Off"
         self.outputURL = outputURL
         let spaceCheck = outputURL.flatMap {
             DestinationSpaceCheck.evaluate(inspection: inspection, outputURL: $0)
@@ -103,10 +104,10 @@ struct ConversionPlan: Sendable {
         if colorSelection == .needsConfirmation {
             warnings.append("Color metadata is missing. Confirm that the source is SDR before conversion.")
         }
-        if summary.audio == nil {
+        if audioMode == .convert, summary.audio == nil {
             warnings.append("No primary audio stream was found.")
         }
-        if summary.audio?.advancedFormat != nil {
+        if audioMode == .convert, summary.audio?.advancedFormat != nil {
             warnings.append("The compatibility audio track will not preserve Atmos.")
         }
         if case .chooseBeforeConversion = subtitleAction {

@@ -4,7 +4,7 @@ SwiftyTranscoder is a native macOS SwiftUI application for turning MKV and compa
 
 ## Download and install
 
-Download **SwiftyTranscoder_1.5.0_arm64.dmg** from [the latest release](https://github.com/KwisatzJim/SwiftyTranscoder/releases/latest), open it, and drag the app to **Applications**. Requires an Apple Silicon Mac running macOS 14 or later.
+Download **SwiftyTranscoder_1.6.0_arm64.dmg** from [the latest release](https://github.com/KwisatzJim/SwiftyTranscoder/releases/latest), open it, and drag the app to **Applications**. Requires an Apple Silicon Mac running macOS 14 or later.
 
 This personal release is signed locally and is not Apple-notarized. If macOS blocks the first launch, use **System Settings → Privacy & Security → Open Anyway** after confirming the download came from this repository. The release includes a SHA-256 checksum, its CLI launcher, and usage instructions. FFmpeg and the AI models are bundled; Python and Homebrew are not required to run the app.
 
@@ -86,6 +86,8 @@ swift test
 ```
 
 ## Local releases
+
+The arm64 `1.6.0 (16)` installer adds per-file **Remove all audio** and CLI `--audio omit` for ordinary conversion. It also fixes incorrect player durations caused by malformed chapter lists and detects supported 5.1 audio whose layout appears later in the source. Its artifact is `dist/SwiftyTranscoder_1.6.0_arm64.dmg`. Automated checks, feature playback reviews, and installed-version acceptance passed.
 
 The personal arm64 `1.5.0 (15)` release adds accepted opt-in single-video resume and CLI saved jobs. Completed blocks survive interruption and are verified before reuse; resumed elapsed time, speed, and remaining-time estimates count new work appropriately. Its artifact is `dist/SwiftyTranscoder_1.5.0_arm64.dmg`. The existing CLI launcher uses the updated app after installation.
 

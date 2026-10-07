@@ -38,6 +38,7 @@ struct VideoConversionCommand: Sendable {
     let burnedSubtitleStreamIndex: Int?
     let videoMode: VideoConversionMode
     let includesAACStereoTrack: Bool
+    let audioMode: ConversionAudioMode
 
     static func partialOutputURL(for finalOutputURL: URL) -> URL {
         finalOutputURL
@@ -54,6 +55,7 @@ struct VideoConversionCommand: Sendable {
         aacStereoEnabled: Bool,
         colorSelection: ColorSelection,
         subtitleSelection: SubtitleSelection,
+        audioMode: ConversionAudioMode = .convert,
         bundleURL: URL = Bundle.main.bundleURL,
         fileManager: FileManager = .default
     ) throws {
@@ -85,15 +87,14 @@ struct VideoConversionCommand: Sendable {
             )
         }
 
-        guard let audio = inspection.audioStreams.first else {
-            throw VideoConversionCommandError.noAudio(file: sourceURL.lastPathComponent)
-        }
-        guard let audioSettings = CompatibilityAudioSettings(source: audio) else {
-            throw VideoConversionCommandError.unsupportedAudio(
-                file: sourceURL.lastPathComponent,
-                layout: audio.channelLayout ?? "unknown",
-                sampleRate: audio.sampleRate ?? "unknown"
-            )
+        let audio = inspection.audioStreams.first
+        let audioSettings = audio.flatMap(CompatibilityAudioSettings.init(source:))
+        if audioMode == .convert {
+            guard let audio else { throw VideoConversionCommandError.noAudio(file: sourceURL.lastPathComponent) }
+            guard audioSettings != nil else {
+                throw VideoConversionCommandError.unsupportedAudio(file: sourceURL.lastPathComponent,
+                    layout: audio.channelLayout ?? "unknown", sampleRate: audio.sampleRate ?? "unknown")
+            }
         }
         guard let outputURL else {
             throw VideoConversionCommandError.outputNotSelected
@@ -164,28 +165,29 @@ struct VideoConversionCommand: Sendable {
         let isTenBit = video.pixelFormat == "yuv420p10le"
         let outputProfile = isTenBit ? "main10" : "main"
         let outputPixelFormat = isTenBit ? "p010le" : "yuv420p"
-        let audioLanguage = audio.tags?["language"]?.isEmpty == false
-            ? audio.tags?["language"] ?? "und"
+        let audioLanguage = audio?.tags?["language"]?.isEmpty == false
+            ? audio?.tags?["language"] ?? "und"
             : "und"
 
         self.executableURL = executableURL
         self.sourceURL = sourceURL
         self.partialOutputURL = partialOutputURL
         self.finalOutputURL = outputURL
-        includesAACStereoTrack = aacStereoEnabled
+        self.audioMode = audioMode
+        includesAACStereoTrack = audioMode == .convert && aacStereoEnabled
         var arguments = [
             "-hide_banner",
             "-nostdin",
             "-n",
             "-i", sourceURL.path(percentEncoded: false),
             "-map", "0:v:0",
-            "-map", "0:a:0",
             "-sn",
             "-dn",
         ]
-        if aacStereoEnabled {
+        if audioMode == .convert {
             arguments += ["-map", "0:a:0"]
-        }
+            if aacStereoEnabled { arguments += ["-map", "0:a:0"] }
+        } else { arguments += ["-an"] }
         if !videoFilters.isEmpty {
             arguments += ["-vf", videoFilters.joined(separator: ",")]
         }
@@ -202,41 +204,43 @@ struct VideoConversionCommand: Sendable {
                 "-fps_mode", "passthrough",
             ]
         }
-        let gainFilter = "volume=6dB,alimiter=limit=0.630957:level=false:latency=true"
-        if gainEnabled {
-            arguments += ["-filter:a:0", gainFilter]
-        }
-        arguments += [
-            "-c:a:0", "ac3",
-            "-b:a:0", audioSettings.bitRate,
-            "-ar:a:0", "48000",
-            "-ac:a:0", String(audioSettings.channels),
-            "-metadata:s:a:0", "language=\(audioLanguage)",
-            "-metadata:s:a:0", gainEnabled
-                ? "title=Primary Audio AC-3 \(audioSettings.description) Compatibility +6 dB Limited"
-                : "title=Primary Audio AC-3 \(audioSettings.description) Compatibility",
-            "-disposition:a:0", "default",
-        ]
-        if aacStereoEnabled {
-            let stereoFilter = gainEnabled
-                ? "aformat=channel_layouts=stereo,\(gainFilter)"
-                : "aformat=channel_layouts=stereo"
+        if audioMode == .convert, let audioSettings {
+            let gainFilter = "volume=6dB,alimiter=limit=0.630957:level=false:latency=true"
+            if gainEnabled {
+                arguments += ["-filter:a:0", gainFilter]
+            }
             arguments += [
-                "-filter:a:1", stereoFilter,
-                "-c:a:1", "aac",
-                "-b:a:1", "192000",
-                "-ar:a:1", "48000",
-                "-ac:a:1", "2",
-                "-metadata:s:a:1", "language=\(audioLanguage)",
-                "-metadata:s:a:1", gainEnabled
-                    ? "title=Secondary Audio AAC stereo at 192 kb/s Compatibility +6 dB Limited"
-                    : "title=Secondary Audio AAC stereo at 192 kb/s Compatibility",
-                "-disposition:a:1", "0",
+                "-c:a:0", "ac3",
+                "-b:a:0", audioSettings.bitRate,
+                "-ar:a:0", "48000",
+                "-ac:a:0", String(audioSettings.channels),
+                "-metadata:s:a:0", "language=\(audioLanguage)",
+                "-metadata:s:a:0", gainEnabled
+                    ? "title=Primary Audio AC-3 \(audioSettings.description) Compatibility +6 dB Limited"
+                    : "title=Primary Audio AC-3 \(audioSettings.description) Compatibility",
+                "-disposition:a:0", "default",
             ]
+            if aacStereoEnabled {
+                let stereoFilter = gainEnabled
+                    ? "aformat=channel_layouts=stereo,\(gainFilter)"
+                    : "aformat=channel_layouts=stereo"
+                arguments += [
+                    "-filter:a:1", stereoFilter,
+                    "-c:a:1", "aac",
+                    "-b:a:1", "192000",
+                    "-ar:a:1", "48000",
+                    "-ac:a:1", "2",
+                    "-metadata:s:a:1", "language=\(audioLanguage)",
+                    "-metadata:s:a:1", gainEnabled
+                        ? "title=Secondary Audio AAC stereo at 192 kb/s Compatibility +6 dB Limited"
+                        : "title=Secondary Audio AAC stereo at 192 kb/s Compatibility",
+                    "-disposition:a:1", "0",
+                ]
+            }
         }
         arguments += [
             "-map_metadata", "0",
-            "-map_chapters", "0",
+            "-map_chapters", inspection.chaptersAreSafeToCopy ? "0" : "-1",
             "-movflags", "+faststart",
             "-progress", "pipe:1",
             "-nostats",
@@ -280,7 +284,7 @@ enum VideoConversionCommandError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .mp4SubtitleBurnInRequiresTranscode:
-            "MP4 audio-gain conversion copies video unchanged. Choose Omit subtitles; burning subtitles would require re-encoding the video."
+            "MP4/M4V processing copies video unchanged. Choose Omit subtitles; burning subtitles would require re-encoding the video."
         case .noVideo(let file):
             "\(file) has no video stream to convert."
         case .noAudio(let file):

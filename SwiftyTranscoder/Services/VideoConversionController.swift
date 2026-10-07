@@ -42,7 +42,7 @@ final class VideoConversionController: ObservableObject {
     func start(
         command: VideoConversionCommand,
         expectedVideo: MediaStream,
-        expectedAudio: MediaStream,
+        expectedAudio: MediaStream?,
         videoMode: VideoConversionMode,
         colorSelection: ColorSelection,
         durationSeconds: Double
@@ -183,7 +183,7 @@ final class VideoConversionController: ObservableObject {
             return
         }
 
-        guard let expectedVideo, let expectedAudio, let expectedVideoMode, let colorSelection, let expectedDurationSeconds else {
+        guard let expectedVideo, let expectedVideoMode, let colorSelection, let expectedDurationSeconds else {
             phase = .failed("The expected source-media details were unavailable.", partialOutput: command.partialOutputURL)
             return
         }
@@ -196,6 +196,7 @@ final class VideoConversionController: ObservableObject {
                 expectedAudio: expectedAudio,
                 videoMode: expectedVideoMode,
                 includesAACStereoTrack: command.includesAACStereoTrack,
+                audioMode: command.audioMode,
                 colorSelection: colorSelection,
                 expectedDurationSeconds: expectedDurationSeconds
             )
@@ -263,9 +264,10 @@ final class VideoConversionController: ObservableObject {
     private func validate(
         _ inspection: MediaInspection,
         expectedVideo: MediaStream,
-        expectedAudio: MediaStream,
+        expectedAudio: MediaStream?,
         videoMode: VideoConversionMode,
         includesAACStereoTrack: Bool,
+        audioMode: ConversionAudioMode,
         colorSelection: ColorSelection,
         expectedDurationSeconds: Double
     ) throws {
@@ -314,59 +316,66 @@ final class VideoConversionController: ObservableObject {
                 actual: outputVideo.averageFrameRate ?? "unknown"
             )
         }
-        let expectedAudioStreamCount = includesAACStereoTrack ? 2 : 1
-        guard inspection.audioStreams.count == expectedAudioStreamCount,
-              let outputAudio = inspection.audioStreams.first else {
-            throw VideoConversionControllerError.invalidAudioStreamCount(
-                expected: expectedAudioStreamCount,
-                count: inspection.audioStreams.count
-            )
-        }
-        guard let audioSettings = CompatibilityAudioSettings(source: expectedAudio) else {
-            throw VideoConversionControllerError.changedAudioChannels
-        }
-        guard outputAudio.codecName == "ac3",
-              outputAudio.codecTagString == "ac-3",
-              outputAudio.channels == audioSettings.channels,
-              outputAudio.channelLayout.map(audioSettings.acceptedLayouts.contains) == true,
-              outputAudio.sampleRate == "48000",
-              outputAudio.bitRate == audioSettings.bitRate else {
-            throw VideoConversionControllerError.invalidAudio(
-                expected: audioSettings.description,
-                codec: outputAudio.codecName ?? "unknown",
-                layout: outputAudio.channelLayout ?? "unknown",
-                sampleRate: outputAudio.sampleRate ?? "unknown",
-                bitRate: outputAudio.bitRate ?? "unknown"
-            )
-        }
-        let expectedLanguage = expectedAudio.tags?["language"] ?? "und"
-        guard (outputAudio.tags?["language"] ?? "und") == expectedLanguage,
-              outputAudio.disposition?.isDefault == 1 else {
-            throw VideoConversionControllerError.invalidAudioMetadata(
-                track: "primary AC-3"
-            )
-        }
-        if includesAACStereoTrack {
-            let secondaryAudio = inspection.audioStreams[1]
-            let secondaryBitRate = secondaryAudio.bitRate.flatMap(Int.init) ?? 0
-            guard secondaryAudio.codecName == "aac",
-                  secondaryAudio.codecTagString == "mp4a",
-                  secondaryAudio.channels == 2,
-                  secondaryAudio.channelLayout == "stereo",
-                  secondaryAudio.sampleRate == "48000",
-                  (180_000...205_000).contains(secondaryBitRate) else {
-                throw VideoConversionControllerError.invalidSecondaryAudio(
-                    codec: secondaryAudio.codecName ?? "unknown",
-                    layout: secondaryAudio.channelLayout ?? "unknown",
-                    sampleRate: secondaryAudio.sampleRate ?? "unknown",
-                    bitRate: secondaryAudio.bitRate ?? "unknown"
+        if audioMode == .omit {
+            guard inspection.audioStreams.isEmpty else {
+                throw VideoConversionControllerError.invalidAudioStreamCount(expected: 0, count: inspection.audioStreams.count)
+            }
+        } else {
+            guard let expectedAudio else { throw VideoConversionControllerError.changedAudioChannels }
+            let expectedAudioStreamCount = includesAACStereoTrack ? 2 : 1
+            guard inspection.audioStreams.count == expectedAudioStreamCount,
+                  let outputAudio = inspection.audioStreams.first else {
+                throw VideoConversionControllerError.invalidAudioStreamCount(
+                    expected: expectedAudioStreamCount,
+                    count: inspection.audioStreams.count
                 )
             }
-            guard (secondaryAudio.tags?["language"] ?? "und") == expectedLanguage,
-                  secondaryAudio.disposition?.isDefault != 1 else {
-                throw VideoConversionControllerError.invalidAudioMetadata(
-                    track: "secondary AAC stereo"
+            guard let audioSettings = CompatibilityAudioSettings(source: expectedAudio) else {
+                throw VideoConversionControllerError.changedAudioChannels
+            }
+            guard outputAudio.codecName == "ac3",
+                  outputAudio.codecTagString == "ac-3",
+                  outputAudio.channels == audioSettings.channels,
+                  outputAudio.channelLayout.map(audioSettings.acceptedLayouts.contains) == true,
+                  outputAudio.sampleRate == "48000",
+                  outputAudio.bitRate == audioSettings.bitRate else {
+                throw VideoConversionControllerError.invalidAudio(
+                    expected: audioSettings.description,
+                    codec: outputAudio.codecName ?? "unknown",
+                    layout: outputAudio.channelLayout ?? "unknown",
+                    sampleRate: outputAudio.sampleRate ?? "unknown",
+                    bitRate: outputAudio.bitRate ?? "unknown"
                 )
+            }
+            let expectedLanguage = expectedAudio.tags?["language"] ?? "und"
+            guard (outputAudio.tags?["language"] ?? "und") == expectedLanguage,
+                  outputAudio.disposition?.isDefault == 1 else {
+                throw VideoConversionControllerError.invalidAudioMetadata(
+                    track: "primary AC-3"
+                )
+            }
+            if includesAACStereoTrack {
+                let secondaryAudio = inspection.audioStreams[1]
+                let secondaryBitRate = secondaryAudio.bitRate.flatMap(Int.init) ?? 0
+                guard secondaryAudio.codecName == "aac",
+                      secondaryAudio.codecTagString == "mp4a",
+                      secondaryAudio.channels == 2,
+                      secondaryAudio.channelLayout == "stereo",
+                      secondaryAudio.sampleRate == "48000",
+                      (180_000...205_000).contains(secondaryBitRate) else {
+                    throw VideoConversionControllerError.invalidSecondaryAudio(
+                        codec: secondaryAudio.codecName ?? "unknown",
+                        layout: secondaryAudio.channelLayout ?? "unknown",
+                        sampleRate: secondaryAudio.sampleRate ?? "unknown",
+                        bitRate: secondaryAudio.bitRate ?? "unknown"
+                    )
+                }
+                guard (secondaryAudio.tags?["language"] ?? "und") == expectedLanguage,
+                      secondaryAudio.disposition?.isDefault != 1 else {
+                    throw VideoConversionControllerError.invalidAudioMetadata(
+                        track: "secondary AAC stereo"
+                    )
+                }
             }
         }
         guard inspection.subtitleStreams.isEmpty else {

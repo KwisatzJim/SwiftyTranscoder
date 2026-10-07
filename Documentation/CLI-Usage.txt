@@ -47,3 +47,10 @@ Existing final and destination partial files remain protected against replacemen
 Average speed counts newly processed frames; resumed elapsed time covers this run.
 The GUI offers the same opt-in behavior for a single file through Keep progress,
 with a saved job folder beside the chosen output. Batch resume is not exposed yet.
+
+Video-only ordinary conversion (1.6.0 and later):
+swiftytranscoder "/path/to/input.mp4" --audio omit --output "/path/to/video-only.mp4"
+This removes every audio track and ignores gain/AAC settings. Compatible MP4/M4V
+video is copied unchanged; MKV follows the existing hardware HEVC conversion.
+Already-silent inputs are supported with --audio omit. This option currently
+applies to ordinary conversion and cannot be combined with --restore.

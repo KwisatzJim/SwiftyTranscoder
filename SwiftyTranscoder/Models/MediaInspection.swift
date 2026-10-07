@@ -9,6 +9,20 @@ struct MediaInspection: Decodable, Sendable {
     var audioStreams: [MediaStream] { streams.filter { $0.codecType == "audio" } }
     var subtitleStreams: [MediaStream] { streams.filter { $0.codecType == "subtitle" } }
     var attachmentStreams: [MediaStream] { streams.filter { $0.codecType == "attachment" } }
+
+    // MP4 players may use the chapter track's length instead of the movie's.
+    // Do not copy a malformed list that extends beyond the actual media.
+    var chaptersAreSafeToCopy: Bool {
+        guard !chapters.isEmpty,
+              let text = format.duration, let duration = Double(text),
+              duration.isFinite, duration > 0 else { return false }
+        return chapters.allSatisfy { chapter in
+            guard let startText = chapter.startTime, let start = Double(startText),
+                  let endText = chapter.endTime, let end = Double(endText),
+                  start.isFinite, end.isFinite else { return false }
+            return start >= 0 && end >= start && start < duration && end <= duration + 0.1
+        }
+    }
 }
 
 struct MediaStream: Decodable, Identifiable, Sendable {
@@ -26,6 +40,7 @@ struct MediaStream: Decodable, Identifiable, Sendable {
     let colorTransfer: String?
     let colorPrimaries: String?
     let averageFrameRate: String?
+    let duration: String?
     let numberOfFrames: String?
     let channels: Int?
     let channelLayout: String?
@@ -53,6 +68,7 @@ struct MediaStream: Decodable, Identifiable, Sendable {
         colorPrimaries: String?,
         averageFrameRate: String?,
         numberOfFrames: String? = nil,
+        duration: String? = nil,
         channels: Int?,
         channelLayout: String?,
         sampleRate: String?,
@@ -74,6 +90,7 @@ struct MediaStream: Decodable, Identifiable, Sendable {
         self.colorTransfer = colorTransfer
         self.colorPrimaries = colorPrimaries
         self.averageFrameRate = averageFrameRate
+        self.duration = duration
         self.numberOfFrames = numberOfFrames
         self.channels = channels
         self.channelLayout = channelLayout
@@ -84,7 +101,7 @@ struct MediaStream: Decodable, Identifiable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case index, profile, width, height, channels, tags, disposition
+        case index, profile, width, height, channels, tags, disposition, duration
         case codecName = "codec_name"
         case codecLongName = "codec_long_name"
         case codecTagString = "codec_tag_string"

@@ -30,11 +30,11 @@ enum CommandLineRunner {
             let inspection = try await MediaProbe().inspect(source)
             guard !interruption.requested else { return 130 }
             guard let video = inspection.videoStreams.first,
-                  let audio = inspection.audioStreams.first,
-                  let duration = inspection.format.duration.flatMap(Double.init),
+                  let duration = options.audioMode.expectedDuration(in: inspection),
                   duration.isFinite, duration > 0 else {
-                throw CLIUsageError("Input requires video, audio, and a valid duration.")
+                throw CLIUsageError("Input requires video and a valid duration.")
             }
+            let audio = inspection.audioStreams.first
             var color = ColorSelection(video: video)
             if options.assumeBT709 {
                 guard source.pathExtension.lowercased() == "mkv", color == .needsConfirmation else {
@@ -55,7 +55,7 @@ enum CommandLineRunner {
             let command = try VideoConversionCommand(
                 sourceURL: source, outputURL: output, inspection: inspection,
                 gainEnabled: options.gainDB == 6, aacStereoEnabled: options.aacStereo,
-                colorSelection: color, subtitleSelection: subtitles
+                colorSelection: color, subtitleSelection: subtitles, audioMode: options.audioMode
             )
             let restorationPlan: RestorationPlan?
             if let method = options.restorationMethod {
@@ -91,7 +91,8 @@ enum CommandLineRunner {
                 restorationPlan = nil
                 print("Video: \(command.videoMode == .copyVideo ? "copy unchanged" : "Apple hardware HEVC")")
             }
-            print("Audio: primary AC-3; protected gain \(options.gainDB) dB; AAC stereo \(options.aacStereo ? "on" : "off")")
+            if options.audioMode == .omit { print("Audio: omit all tracks (video only; gain and AAC disabled)") }
+            else { print("Audio: primary AC-3; protected gain \(options.gainDB) dB; AAC stereo \(options.aacStereo ? "on" : "off")") }
             print("Subtitles: \(options.subtitles ?? "omit (no subtitle streams)")")
             print("Output: \(output.path)")
             if options.dryRun { print("Dry run complete; no output written."); return 0 }

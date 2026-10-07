@@ -36,6 +36,14 @@ struct CLIArgumentsTests {
         #expect(throws: CLIUsageError.self) { try CLIArguments(args.dropLast().map { $0 } + ["/tmp/unrelated"]) }
     }
 
+    @Test func parsesVideoOnlyAndProtectsRestoration() throws {
+        let input = ["input.mp4", "--output", "silent.mp4"]
+        #expect(try CLIArguments(input).audioMode == .convert)
+        #expect(try CLIArguments(input + ["--audio", "omit"]).audioMode == .omit)
+        #expect(throws: CLIUsageError.self) { try CLIArguments(input + ["--audio", "unknown"]) }
+        #expect(throws: CLIUsageError.self) { try CLIArguments(input + ["--audio", "omit", "--restore", "lightweight"]) }
+    }
+
     @Test func acceptsHelpWithoutPathsAndDashPrefixedInput() throws {
         #expect(try CLIArguments(["--help"]).help)
         let options = try CLIArguments(["--output", "result.mp4", "--", "-input.mkv"])

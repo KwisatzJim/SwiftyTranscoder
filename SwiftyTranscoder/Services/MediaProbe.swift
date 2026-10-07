@@ -35,6 +35,10 @@ struct MediaProbe: Sendable {
             process.executableURL = executableURL
             process.arguments = [
                 "-v", "error",
+                // Some E-AC-3 sources need more packets before the decoder
+                // identifies their speaker layout. Keep inspection bounded.
+                "-analyzeduration", "20000000",
+                "-probesize", "20000000",
                 "-print_format", "json",
                 "-show_format",
                 "-show_streams",

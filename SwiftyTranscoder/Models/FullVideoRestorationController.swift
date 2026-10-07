@@ -240,7 +240,7 @@ final class FullVideoRestorationController: ObservableObject {
             gainEnabled: gainEnabled,
             aacStereoEnabled: aacStereoEnabled,
             subtitleStreamOrdinal: subtitleStreamOrdinal,
-            expectedChapterCount: inspection.chapters.count,
+            expectedChapterCount: inspection.chaptersAreSafeToCopy ? inspection.chapters.count : 0,
             expectedContainerTitle: title,
             checkpointMode: checkpointMode
         )

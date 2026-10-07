@@ -139,7 +139,7 @@ struct RestorationAudioMux: Sendable {
         // preserve every restored frame even if audio ends a few milliseconds early.
         if scope == .preview { arguments += ["-shortest"] }
         arguments += [
-            "-map_metadata", "1", "-map_chapters", scope == .fullDuration ? "1" : "-1",
+            "-map_metadata", "1", "-map_chapters", scope == .fullDuration && expectedChapterCount > 0 ? "1" : "-1",
             "-avoid_negative_ts", "make_zero",
             "-movflags", "+faststart", "-progress", "pipe:1", "-nostats",
             outputURL.path(percentEncoded: false),

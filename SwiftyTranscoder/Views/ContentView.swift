@@ -39,6 +39,7 @@ struct ContentView: View {
     @State private var selectionError: String?
     @State private var notificationError: String?
     @State private var queueIndexPendingRemoval: Int?
+    @State private var removeAudio = false
     @State private var gainEnabled = true
     @State private var aacStereoEnabled = false
     @State private var colorSelection = ColorSelection.needsConfirmation
@@ -625,6 +626,7 @@ struct ContentView: View {
                     inspection: inspection,
                     gainEnabled: gainEnabled,
                     aacStereoEnabled: aacStereoEnabled,
+                    audioMode: removeAudio ? .omit : .convert,
                     colorSelection: colorSelection,
                     subtitleSelection: subtitleSelection,
                     restorationPlan: restorationEnabled ? restorationPlan : nil,
@@ -635,6 +637,8 @@ struct ContentView: View {
                 sourceURL: sourceURL,
                 subtitleStreams: inspection.subtitleStreams,
                 sourceDynamicRange: MediaSummary(inspection: inspection).video?.dynamicRange,
+                allowsAudioRemoval: !restorationEnabled,
+                removeAudio: $removeAudio,
                 gainEnabled: $gainEnabled,
                 aacStereoEnabled: $aacStereoEnabled,
                 colorSelection: $colorSelection,
@@ -658,7 +662,12 @@ struct ContentView: View {
                         }
                     )
                 )
-                .disabled(isBatchRunning || isBatchReady || isRestorationPreviewActive)
+                .disabled(isBatchRunning || isBatchReady || isRestorationPreviewActive || removeAudio)
+
+                if removeAudio {
+                    Text("Turn off Remove all audio to use AI restoration.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
 
                 RestorationPreviewView(
                     sourceURL: sourceURL,
@@ -828,6 +837,7 @@ struct ContentView: View {
         restorationController.reset()
         selectedSource = source
         inspection = nil
+        removeAudio = false
         gainEnabled = defaultGainEnabled
         aacStereoEnabled = defaultAACStereoEnabled
         colorSelection = .needsConfirmation
@@ -870,6 +880,7 @@ struct ContentView: View {
                 let probe = try MediaProbe()
                 let result = try await probe.inspect(source)
                 inspection = result
+                removeAudio = result.audioStreams.isEmpty
                 colorSelection = ColorSelection(video: result.videoStreams.first)
                 let recommendedSelection = SubtitleSelection(
                     recommendation: SubtitleRecommendationEngine().recommend(
@@ -903,7 +914,8 @@ struct ContentView: View {
                 gainEnabled: gainEnabled,
                 aacStereoEnabled: aacStereoEnabled,
                 colorSelection: colorSelection,
-                subtitleSelection: subtitleSelection
+                subtitleSelection: subtitleSelection,
+                audioMode: removeAudio ? .omit : .convert
             )
             return nil
         } catch {
@@ -963,17 +975,17 @@ struct ContentView: View {
                 gainEnabled: gainEnabled,
                 aacStereoEnabled: aacStereoEnabled,
                 colorSelection: colorSelection,
-                subtitleSelection: subtitleSelection
+                subtitleSelection: subtitleSelection,
+                audioMode: removeAudio ? .omit : .convert
             )
             guard let expectedVideo = inspection.videoStreams.first,
-                  let expectedAudio = inspection.audioStreams.first,
-                  let duration = inspection.format.duration.flatMap(Double.init) else {
+                  let duration = (removeAudio ? ConversionAudioMode.omit : .convert).expectedDuration(in: inspection) else {
                 throw VideoConversionCommandError.noVideo(file: sourceURL.lastPathComponent)
             }
             try conversionController.start(
                 command: command,
                 expectedVideo: expectedVideo,
-                expectedAudio: expectedAudio,
+                expectedAudio: inspection.audioStreams.first,
                 videoMode: command.videoMode,
                 colorSelection: colorSelection,
                 durationSeconds: duration
@@ -1030,7 +1042,8 @@ struct ContentView: View {
                 gainEnabled: gainEnabled,
                 aacStereoEnabled: aacStereoEnabled,
                 colorSelection: colorSelection,
-                subtitleSelection: subtitleSelection
+                subtitleSelection: subtitleSelection,
+                audioMode: removeAudio ? .omit : .convert
             )
             guard let outputURL else { return }
             approvedPlans[currentQueueIndex] = ApprovedConversion(
@@ -1039,6 +1052,7 @@ struct ContentView: View {
                 outputURL: outputURL,
                 gainEnabled: gainEnabled,
                 aacStereoEnabled: aacStereoEnabled,
+                removeAudio: removeAudio,
                 colorSelection: colorSelection,
                 subtitleSelection: subtitleSelection,
                 restorationPlan: restorationEnabled ? eligibleRestorationPlan(for: inspection) : nil
@@ -1083,6 +1097,7 @@ struct ContentView: View {
         outputURL = approved.outputURL
         gainEnabled = approved.gainEnabled
         aacStereoEnabled = approved.aacStereoEnabled
+        removeAudio = approved.removeAudio
         colorSelection = approved.colorSelection
         subtitleSelection = approved.subtitleSelection
         restorationEnabled = approved.restorationPlan != nil
@@ -1215,6 +1230,7 @@ struct ContentView: View {
         outputURL = approved.outputURL
         gainEnabled = approved.gainEnabled
         aacStereoEnabled = approved.aacStereoEnabled
+        removeAudio = approved.removeAudio
         colorSelection = approved.colorSelection
         subtitleSelection = approved.subtitleSelection
         conversionController.reset()
@@ -1323,6 +1339,7 @@ private struct ApprovedConversion {
     let outputURL: URL
     let gainEnabled: Bool
     let aacStereoEnabled: Bool
+    let removeAudio: Bool
     let colorSelection: ColorSelection
     let subtitleSelection: SubtitleSelection
     let restorationPlan: RestorationPlan?

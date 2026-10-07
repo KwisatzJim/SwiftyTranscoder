@@ -7,6 +7,8 @@ struct ConversionPlanView: View {
     let sourceURL: URL
     let subtitleStreams: [MediaStream]
     let sourceDynamicRange: String?
+    let allowsAudioRemoval: Bool
+    @Binding var removeAudio: Bool
     @Binding var gainEnabled: Bool
     @Binding var aacStereoEnabled: Bool
     @Binding var colorSelection: ColorSelection
@@ -43,11 +45,20 @@ struct ConversionPlanView: View {
                     }
                     .font(.callout)
                     planRow("Audio", plan.audioFormat)
+                    GridRow {
+                        Text("Video only").foregroundStyle(.secondary)
+                        Toggle("Remove all audio", isOn: $removeAudio)
+                            .toggleStyle(.switch)
+                            .disabled(!allowsAudioRemoval)
+                            .gridColumnAlignment(.leading)
+                    }
+                    .font(.callout)
                     planRow("Output storage", plan.storageStatus)
                     GridRow {
                         Text("Gain")
                             .foregroundStyle(.secondary)
                         Toggle(plan.audioGain, isOn: $gainEnabled)
+                            .disabled(removeAudio)
                             .toggleStyle(.switch)
                             .gridColumnAlignment(.leading)
                     }
@@ -56,6 +67,7 @@ struct ConversionPlanView: View {
                         Text("Extra audio")
                             .foregroundStyle(.secondary)
                         Toggle("Add AAC stereo compatibility track", isOn: $aacStereoEnabled)
+                            .disabled(removeAudio)
                             .toggleStyle(.switch)
                             .gridColumnAlignment(.leading)
                     }
@@ -97,7 +109,11 @@ struct ConversionPlanView: View {
                     .font(.callout)
                 }
 
-                if aacStereoEnabled {
+                if removeAudio {
+                    Text("The output will have no audio tracks. Gain and AAC settings are ignored for this file; the source remains unchanged.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if aacStereoEnabled && !removeAudio {
                     Label(
                         "AC-3 remains the default primary track; AAC stereo will be added as a secondary compatibility track.",
                         systemImage: "info.circle.fill"

@@ -124,3 +124,20 @@ After the user accepted resumed playback and the single-video interface, version
 ## 123 — Public GitHub repository and 1.5.0 release
 
 The user authorized the public `KwisatzJim/SwiftyTranscoder` repository and MIT license for original code. Source and the `v1.5.0` tag are published, with the accepted installer, third-party component source bundle, and checksums attached to the GitHub Release. A clean source build passed, build/download instructions are current, and GitHub asset digests/sizes match local verified files. Publication is complete. See `Milestone-123.md`.
+
+
+## 124 — Remove audio for support videos
+
+Explicit per-file video-only ordinary conversion is implemented in GUI and CLI (`--audio omit`). MP4/M4V video is copied unchanged; MKV retains hardware encoding. Gain/AAC options are ignored, reviewed ordinary batch choices are retained, and validation requires zero output audio tracks. All 169 tests, ordinary-conversion regression checks, app verification, and real video/size/hash/refusal checks passed. The user confirmed playback and interface acceptance; packaging is underway. See `Milestone-124.md`.
+
+## 125 — Correct malformed chapter duration
+
+Chapter lists extending beyond the movie are omitted during ordinary conversion and full AI restoration. Corrected-copy duration and playback were confirmed by the user; focused tests and the app build passed. See `Milestone-125.md`.
+
+## 126 — Detect delayed audio layouts
+
+Bounded, expanded inspection identifies 5.1 E-AC-3 layouts missed by the default scan. The affected full conversion and playback were confirmed by the user. See `Milestone-126.md`.
+
+## 127 — Local 1.6.0 release
+
+Version 1.6.0 (16) packages accepted audio removal and both movie fixes. All 172 tests, installer integrity/signatures/resources, packaged conversion/refusal/cancellation checks, and retained-installer checksums passed. The user confirmed installed-version acceptance; GitHub publication is authorized. See `Milestone-127.md`.
