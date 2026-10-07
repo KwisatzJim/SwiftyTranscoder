@@ -87,7 +87,7 @@ swift test
 
 ## Local releases
 
-The arm64 `1.6.0 (16)` installer adds per-file **Remove all audio** and CLI `--audio omit` for ordinary conversion. It also fixes incorrect player durations caused by malformed chapter lists and detects supported 5.1 audio whose layout appears later in the source. Its artifact is `dist/SwiftyTranscoder_1.6.0_arm64.dmg`. Automated checks, feature playback reviews, and installed-version acceptance passed.
+The arm64 `1.6.0 (16)` installer adds per-file **Remove all audio** and CLI `--audio omit` for ordinary conversion. It also fixes incorrect player durations caused by malformed chapter lists and detects supported 5.1 audio whose layout appears later in the source. Its artifact is `dist/SwiftyTranscoder_1.6.0_arm64.dmg`. Automated checks, feature playback reviews, and installed-version acceptance passed. Version 1.6.0 is published on GitHub.
 
 The personal arm64 `1.5.0 (15)` release adds accepted opt-in single-video resume and CLI saved jobs. Completed blocks survive interruption and are verified before reuse; resumed elapsed time, speed, and remaining-time estimates count new work appropriately. Its artifact is `dist/SwiftyTranscoder_1.5.0_arm64.dmg`. The existing CLI launcher uses the updated app after installation.
 

@@ -12,4 +12,4 @@ All 172 regression tests in 42 suites passed. The release process rebuilt the bu
 
 Packaged-app checks passed for ordinary MKV/MP4 conversion, gain/AC-3/AAC, cancellation, video-only output, identical MP4 compressed-video hash, reduced size, silent input, longer audio tails, collision refusal, and rejection of deliberately retained audio before promotion. A short malformed-chapter fixture produced the expected duration with no chapters; the reported E-AC-3 source passed packaged CLI dry-run approval. Earlier installer checksums remain valid. Evidence is in `.build/milestone127-evidence/` and the release log.
 
-The user confirmed installed 1.6.0 acceptance. GitHub publication is authorized.
+The user confirmed installed 1.6.0 acceptance. GitHub publication is complete. The public v1.6.0 release contains the installer, third-party source bundle, and checksums. All three remote asset sizes and SHA-256 digests match local files, and a fresh source build passed.

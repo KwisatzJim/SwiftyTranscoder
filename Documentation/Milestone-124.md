@@ -10,6 +10,6 @@ Video-only duration validation prefers the video stream's duration, Matroska DUR
 
 The optimized development app is `.build/Milestone124DerivedData/Build/Products/Release/SwiftyTranscoder.app`. Focused parser and duration checks passed (10 tests). Real checks passed for video-only MP4, identical compressed HEVC stream hash, smaller file size (3,814,925 → 3,650,085 bytes), silent input, a longer audio tail, MKV hardware HEVC output, existing-file refusal, and unchanged source content. A deliberately faulty helper retained audio; the app rejected it with Expected 0 output audio streams, retained the labeled partial, and never promoted a final file. Evidence: `.build/milestone124-evidence/`.
 
-The user confirmed silent playback and the audio-removal interface; this checkpoint is accepted. A new release is being prepared. The public 1.5.0 installer does not contain this new option.
+The user confirmed silent playback and the audio-removal interface; this checkpoint is accepted. Version 1.6.0 includes this option. The public 1.5.0 installer does not contain this new option.
 
 Final automated validation: all 169 tests in 41 suites passed, ordinary MKV/MP4 audio/gain/video-copy/cancellation smoke checks passed, and the final optimized app passed strict signatures and resource/helper/model checks. User review is complete.

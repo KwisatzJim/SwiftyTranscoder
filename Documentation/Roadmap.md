@@ -140,4 +140,4 @@ Bounded, expanded inspection identifies 5.1 E-AC-3 layouts missed by the default
 
 ## 127 — Local 1.6.0 release
 
-Version 1.6.0 (16) packages accepted audio removal and both movie fixes. All 172 tests, installer integrity/signatures/resources, packaged conversion/refusal/cancellation checks, and retained-installer checksums passed. The user confirmed installed-version acceptance; GitHub publication is authorized. See `Milestone-127.md`.
+Version 1.6.0 (16) packages accepted audio removal and both movie fixes. All 172 tests, installer integrity/signatures/resources, packaged conversion/refusal/cancellation checks, and retained-installer checksums passed. The user confirmed installed-version acceptance; GitHub publication and remote asset checksum verification are complete. See `Milestone-127.md`.
