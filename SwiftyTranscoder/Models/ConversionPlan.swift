@@ -21,6 +21,7 @@ struct ConversionPlan: Sendable {
         gainEnabled: Bool = true,
         aacStereoEnabled: Bool = false,
         audioMode: ConversionAudioMode = .convert,
+        outputResolution: OutputResolution = .original,
         colorSelection: ColorSelection,
         subtitleSelection: SubtitleSelection,
         restorationPlan: RestorationPlan? = nil,
@@ -30,16 +31,20 @@ struct ConversionPlan: Sendable {
     ) {
         let summary = MediaSummary(inspection: inspection)
         let isMP4Source = inspection.format.formatName?.lowercased().contains("mp4") == true
+        let video = inspection.videoStreams.first
+        let dimensions = outputResolution.dimensions(width: video?.width ?? 0, height: video?.height ?? 0)
+        let scalesVideo = dimensions != nil && (dimensions?.width != video?.width || dimensions?.height != video?.height)
         videoFormat = restorationPlan.map {
             "\($0.method.rawValue), then HEVC using Apple hardware"
-        } ?? (isMP4Source
+        } ?? (isMP4Source && !scalesVideo
             ? "Copy source video unchanged (no re-encoding)"
             : "HEVC using Apple hardware")
+        let ordinaryDimensions = scalesVideo && dimensions != nil
+            ? "\(video?.width ?? 0)×\(video?.height ?? 0) → \(dimensions!.width)×\(dimensions!.height)"
+            : summary.video.map { "Preserve source (\($0.resolution)); never upscale" } ?? "Unknown—conversion blocked"
         videoDimensions = restorationPlan.map {
             "\($0.sourceWidth)×\($0.sourceHeight) → \($0.outputWidth)×\($0.outputHeight)"
-        } ?? summary.video.map {
-            "Preserve source (\($0.resolution)); never upscale"
-        } ?? "Unknown—conversion blocked"
+        } ?? ordinaryDimensions
         frameRate = summary.video.map { "Preserve source (\($0.frameRate))" }
             ?? "Unknown—conversion blocked"
         colorHandling = colorSelection.description

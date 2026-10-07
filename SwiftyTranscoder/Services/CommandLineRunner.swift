@@ -55,7 +55,8 @@ enum CommandLineRunner {
             let command = try VideoConversionCommand(
                 sourceURL: source, outputURL: output, inspection: inspection,
                 gainEnabled: options.gainDB == 6, aacStereoEnabled: options.aacStereo,
-                colorSelection: color, subtitleSelection: subtitles, audioMode: options.audioMode
+                colorSelection: color, subtitleSelection: subtitles, audioMode: options.audioMode,
+                outputResolution: options.outputResolution
             )
             let restorationPlan: RestorationPlan?
             if let method = options.restorationMethod {
@@ -89,6 +90,7 @@ enum CommandLineRunner {
                 print("Dimensions: \(plan.sourceWidth)×\(plan.sourceHeight) → \(plan.outputWidth)×\(plan.outputHeight)")
             } else {
                 restorationPlan = nil
+                if let width = command.outputWidth, let height = command.outputHeight { print("Dimensions: \(width)×\(height)") }
                 print("Video: \(command.videoMode == .copyVideo ? "copy unchanged" : "Apple hardware HEVC")")
             }
             if options.audioMode == .omit { print("Audio: omit all tracks (video only; gain and AAC disabled)") }

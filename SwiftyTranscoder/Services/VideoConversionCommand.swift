@@ -38,6 +38,8 @@ struct VideoConversionCommand: Sendable {
     let burnedSubtitleStreamIndex: Int?
     let videoMode: VideoConversionMode
     let includesAACStereoTrack: Bool
+    let outputWidth: Int?
+    let outputHeight: Int?
     let audioMode: ConversionAudioMode
 
     static func partialOutputURL(for finalOutputURL: URL) -> URL {
@@ -56,14 +58,20 @@ struct VideoConversionCommand: Sendable {
         colorSelection: ColorSelection,
         subtitleSelection: SubtitleSelection,
         audioMode: ConversionAudioMode = .convert,
+        outputResolution: OutputResolution = .original,
         bundleURL: URL = Bundle.main.bundleURL,
         fileManager: FileManager = .default
     ) throws {
         let isMP4Source = ["mp4", "m4v"].contains(sourceURL.pathExtension.lowercased())
-        videoMode = isMP4Source ? .copyVideo : .transcodeToHEVC
         guard let video = inspection.videoStreams.first else {
             throw VideoConversionCommandError.noVideo(file: sourceURL.lastPathComponent)
         }
+
+        let dimensions = outputResolution.dimensions(width: video.width ?? 0, height: video.height ?? 0)
+        outputWidth = dimensions?.width ?? video.width
+        outputHeight = dimensions?.height ?? video.height
+        let scalesVideo = outputWidth != video.width || outputHeight != video.height
+        videoMode = isMP4Source && !scalesVideo ? .copyVideo : .transcodeToHEVC
 
         guard ["h264", "hevc"].contains(video.codecName?.lowercased()) else {
             throw VideoConversionCommandError.unsupportedCodec(
@@ -133,7 +141,7 @@ struct VideoConversionCommand: Sendable {
         var videoFilters: [String] = []
         switch subtitleSelection {
         case .burnIn(let streamIndex):
-            guard !isMP4Source else {
+            guard videoMode != .copyVideo else {
                 throw VideoConversionCommandError.mp4SubtitleBurnInRequiresTranscode
             }
             guard let subtitleOrdinal = inspection.subtitleStreams.firstIndex(where: {
@@ -159,6 +167,10 @@ struct VideoConversionCommand: Sendable {
         }
         if !isMP4Source && colorSelection == .confirmUntaggedAsBT709 {
             videoFilters.append("setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709")
+        }
+
+        if scalesVideo, let outputWidth, let outputHeight {
+            videoFilters.append("scale=\(outputWidth):\(outputHeight):flags=lanczos")
         }
 
         let quality = (video.height ?? 0) > 1_080 ? "50" : "60"
@@ -191,7 +203,7 @@ struct VideoConversionCommand: Sendable {
         if !videoFilters.isEmpty {
             arguments += ["-vf", videoFilters.joined(separator: ",")]
         }
-        if isMP4Source {
+        if videoMode == .copyVideo {
             arguments += ["-c:v", "copy"]
         } else {
             arguments += [

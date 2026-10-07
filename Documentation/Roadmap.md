@@ -141,3 +141,12 @@ Bounded, expanded inspection identifies 5.1 E-AC-3 layouts missed by the default
 ## 127 — Local 1.6.0 release
 
 Version 1.6.0 (16) packages accepted audio removal and both movie fixes. All 172 tests, installer integrity/signatures/resources, packaged conversion/refusal/cancellation checks, and retained-installer checksums passed. The user confirmed installed-version acceptance; GitHub publication and remote asset checksum verification are complete. See `Milestone-127.md`.
+
+## 129 — Smaller output for support videos
+
+Ordinary conversion has per-file Original/720p/480p size choices and CLI `--resolution`, with no upscaling, preserved proportions, hardware encoding when reducing size, reviewed batch retention, and validation of output dimensions. Short conversion checks show reduced file sizes and correct landscape/portrait output. The user confirmed controls and playback; local release packaging is authorized. See `Milestone-129.md`.
+
+
+## 130 — Local 1.7.0 release
+
+Version 1.7.0 (17) packages the accepted lower-resolution choices. All 175 tests, signature/resource/model checks, installer integrity, packaged ordinary/resolution/audio/cancellation checks, and retained-installer checksums passed. The user confirmed installed-version acceptance and authorized publication. See `Milestone-130.md`.

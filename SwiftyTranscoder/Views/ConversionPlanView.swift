@@ -9,6 +9,7 @@ struct ConversionPlanView: View {
     let sourceDynamicRange: String?
     let allowsAudioRemoval: Bool
     @Binding var removeAudio: Bool
+    @Binding var outputResolution: OutputResolution
     @Binding var gainEnabled: Bool
     @Binding var aacStereoEnabled: Bool
     @Binding var colorSelection: ColorSelection
@@ -24,6 +25,17 @@ struct ConversionPlanView: View {
                 Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 6) {
                     planRow("Container", plan.container)
                     planRow("Video", plan.videoFormat)
+                    GridRow {
+                        Text("Output size").foregroundStyle(.secondary)
+                        Picker("Output size", selection: $outputResolution) {
+                            ForEach(OutputResolution.allCases, id: \.self) { resolution in
+                                Text(resolution.label).tag(resolution)
+                            }
+                        }
+                        .labelsHidden()
+                        .disabled(!allowsAudioRemoval)
+                    }
+                    .font(.callout)
                     planRow("Dimensions", plan.videoDimensions)
                     planRow("Frame rate", plan.frameRate)
                     GridRow {
@@ -109,6 +121,10 @@ struct ConversionPlanView: View {
                     .font(.callout)
                 }
 
+                if outputResolution != .original {
+                    Text("Smaller output keeps the picture’s proportions and never enlarges the source. Actual file size depends on the video and its length.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 if removeAudio {
                     Text("The output will have no audio tracks. Gain and AAC settings are ignored for this file; the source remains unchanged.")
                         .font(.caption).foregroundStyle(.secondary)

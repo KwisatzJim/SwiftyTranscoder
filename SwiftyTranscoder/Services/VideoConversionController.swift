@@ -197,6 +197,8 @@ final class VideoConversionController: ObservableObject {
                 videoMode: expectedVideoMode,
                 includesAACStereoTrack: command.includesAACStereoTrack,
                 audioMode: command.audioMode,
+                outputWidth: command.outputWidth,
+                outputHeight: command.outputHeight,
                 colorSelection: colorSelection,
                 expectedDurationSeconds: expectedDurationSeconds
             )
@@ -268,6 +270,8 @@ final class VideoConversionController: ObservableObject {
         videoMode: VideoConversionMode,
         includesAACStereoTrack: Bool,
         audioMode: ConversionAudioMode,
+        outputWidth: Int?,
+        outputHeight: Int?,
         colorSelection: ColorSelection,
         expectedDurationSeconds: Double
     ) throws {
@@ -306,8 +310,8 @@ final class VideoConversionController: ObservableObject {
               outputVideo.colorPrimaries == expectedColor.2 else {
             throw VideoConversionControllerError.changedColorMetadata
         }
-        guard outputVideo.width == expectedVideo.width,
-              outputVideo.height == expectedVideo.height else {
+        guard outputVideo.width == outputWidth,
+              outputVideo.height == outputHeight else {
             throw VideoConversionControllerError.changedDimensions
         }
         guard outputVideo.averageFrameRate == expectedVideo.averageFrameRate else {

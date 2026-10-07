@@ -39,6 +39,7 @@ struct ContentView: View {
     @State private var selectionError: String?
     @State private var notificationError: String?
     @State private var queueIndexPendingRemoval: Int?
+    @State private var outputResolution: OutputResolution = .original
     @State private var removeAudio = false
     @State private var gainEnabled = true
     @State private var aacStereoEnabled = false
@@ -627,6 +628,7 @@ struct ContentView: View {
                     gainEnabled: gainEnabled,
                     aacStereoEnabled: aacStereoEnabled,
                     audioMode: removeAudio ? .omit : .convert,
+                    outputResolution: outputResolution,
                     colorSelection: colorSelection,
                     subtitleSelection: subtitleSelection,
                     restorationPlan: restorationEnabled ? restorationPlan : nil,
@@ -639,6 +641,7 @@ struct ContentView: View {
                 sourceDynamicRange: MediaSummary(inspection: inspection).video?.dynamicRange,
                 allowsAudioRemoval: !restorationEnabled,
                 removeAudio: $removeAudio,
+                outputResolution: $outputResolution,
                 gainEnabled: $gainEnabled,
                 aacStereoEnabled: $aacStereoEnabled,
                 colorSelection: $colorSelection,
@@ -662,8 +665,12 @@ struct ContentView: View {
                         }
                     )
                 )
-                .disabled(isBatchRunning || isBatchReady || isRestorationPreviewActive || removeAudio)
+                .disabled(isBatchRunning || isBatchReady || isRestorationPreviewActive || removeAudio || outputResolution != .original)
 
+                if outputResolution != .original {
+                    Text("Choose Original size to enable AI restoration.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 if removeAudio {
                     Text("Turn off Remove all audio to use AI restoration.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -837,6 +844,7 @@ struct ContentView: View {
         restorationController.reset()
         selectedSource = source
         inspection = nil
+        outputResolution = .original
         removeAudio = false
         gainEnabled = defaultGainEnabled
         aacStereoEnabled = defaultAACStereoEnabled
@@ -915,7 +923,8 @@ struct ContentView: View {
                 aacStereoEnabled: aacStereoEnabled,
                 colorSelection: colorSelection,
                 subtitleSelection: subtitleSelection,
-                audioMode: removeAudio ? .omit : .convert
+                audioMode: removeAudio ? .omit : .convert,
+                outputResolution: outputResolution
             )
             return nil
         } catch {
@@ -976,7 +985,8 @@ struct ContentView: View {
                 aacStereoEnabled: aacStereoEnabled,
                 colorSelection: colorSelection,
                 subtitleSelection: subtitleSelection,
-                audioMode: removeAudio ? .omit : .convert
+                audioMode: removeAudio ? .omit : .convert,
+                outputResolution: outputResolution
             )
             guard let expectedVideo = inspection.videoStreams.first,
                   let duration = (removeAudio ? ConversionAudioMode.omit : .convert).expectedDuration(in: inspection) else {
@@ -1043,7 +1053,8 @@ struct ContentView: View {
                 aacStereoEnabled: aacStereoEnabled,
                 colorSelection: colorSelection,
                 subtitleSelection: subtitleSelection,
-                audioMode: removeAudio ? .omit : .convert
+                audioMode: removeAudio ? .omit : .convert,
+                outputResolution: outputResolution
             )
             guard let outputURL else { return }
             approvedPlans[currentQueueIndex] = ApprovedConversion(
@@ -1052,6 +1063,7 @@ struct ContentView: View {
                 outputURL: outputURL,
                 gainEnabled: gainEnabled,
                 aacStereoEnabled: aacStereoEnabled,
+                outputResolution: outputResolution,
                 removeAudio: removeAudio,
                 colorSelection: colorSelection,
                 subtitleSelection: subtitleSelection,
@@ -1098,6 +1110,7 @@ struct ContentView: View {
         gainEnabled = approved.gainEnabled
         aacStereoEnabled = approved.aacStereoEnabled
         removeAudio = approved.removeAudio
+        outputResolution = approved.outputResolution
         colorSelection = approved.colorSelection
         subtitleSelection = approved.subtitleSelection
         restorationEnabled = approved.restorationPlan != nil
@@ -1231,6 +1244,7 @@ struct ContentView: View {
         gainEnabled = approved.gainEnabled
         aacStereoEnabled = approved.aacStereoEnabled
         removeAudio = approved.removeAudio
+        outputResolution = approved.outputResolution
         colorSelection = approved.colorSelection
         subtitleSelection = approved.subtitleSelection
         conversionController.reset()
@@ -1339,6 +1353,7 @@ private struct ApprovedConversion {
     let outputURL: URL
     let gainEnabled: Bool
     let aacStereoEnabled: Bool
+    let outputResolution: OutputResolution
     let removeAudio: Bool
     let colorSelection: ColorSelection
     let subtitleSelection: SubtitleSelection

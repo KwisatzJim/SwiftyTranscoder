@@ -4,6 +4,7 @@ struct CLIArguments: Equatable, Sendable {
     var input: String?
     var output: String?
     var audioMode: ConversionAudioMode = .convert
+    var outputResolution: OutputResolution = .original
     var gainDB = 6
     var aacStereo = true
     var subtitles: String?
@@ -45,6 +46,9 @@ struct CLIArguments: Equatable, Sendable {
                         throw CLIUsageError("--restore currently supports lightweight only.")
                     }
                     restorationMethod = .lightweightFSRCNN
+                case "--resolution":
+                    guard let resolution = OutputResolution(rawValue: try value()) else { throw CLIUsageError("--resolution requires original, 720p, or 480p.") }
+                    outputResolution = resolution
                 case "--audio":
                     guard let mode = ConversionAudioMode(rawValue: try value()) else { throw CLIUsageError("--audio requires convert or omit.") }
                     audioMode = mode
@@ -75,6 +79,7 @@ struct CLIArguments: Equatable, Sendable {
         }
         guard !help else { return }
         guard audioMode != .omit || restorationMethod == nil else { throw CLIUsageError("--audio omit currently applies to ordinary conversion. Remove --restore to create video-only output.") }
+        guard outputResolution == .original || restorationMethod == nil else { throw CLIUsageError("--resolution applies to ordinary conversion; remove --restore.") }
         guard !resume || checkpointDirectory != nil else { throw CLIUsageError("--resume requires --checkpoint-dir.") }
         guard checkpointDirectory == nil || restorationMethod != nil else { throw CLIUsageError("--checkpoint-dir requires --restore lightweight.") }
         if let checkpointDirectory {
@@ -106,6 +111,7 @@ struct CLIArguments: Equatable, Sendable {
       --restore lightweight   Restore eligible tagged SDR video using FSRCNN
       --checkpoint-dir PATH    Save completed blocks in a new persistent job folder
       --resume                 Reuse that folder with exactly the same input/settings
+      --resolution original|720p|480p  Limit output size without enlarging video
       --audio convert|omit     Convert audio (default) or remove all audio tracks
       --gain-db 0|6            Audio gain (default: 6, peak protected)
       --aac-stereo on|off      Secondary AAC stereo (default: on)

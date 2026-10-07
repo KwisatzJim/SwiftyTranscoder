@@ -13,6 +13,14 @@ swiftytranscoder "/path/to/input.mkv" --preset plex --output "/path/to/output.mp
 swiftytranscoder "/path/to/input.mp4" --preset plex --gain-db 6 --output "/path/to/output.mp4"
 
 Use --dry-run to inspect without writing output.
+Smaller ordinary conversion (1.7.0 and later):
+swiftytranscoder "/path/to/input.mp4" --resolution 720p --output "/path/to/smaller.mp4"
+swiftytranscoder "/path/to/input.mp4" --resolution 480p --audio omit --output "/path/to/video-only-small.mp4"
+Choices: original (default), 720p, 480p. Landscape limits are 1280x720 and
+854x480; portrait limits are rotated. Proportions are preserved, dimensions
+are rounded for encoding, and smaller sources are never enlarged.
+Reducing size uses Apple hardware HEVC; it cannot be combined with AI restoration.
+File size depends on content and duration; these choices do not guarantee an email limit.
 Plex defaults: protected +6 dB gain, primary AC-3, secondary AAC stereo.
 Use --gain-db 0 for already-boosted files to avoid applying gain twice.
 MP4/M4V processing copies compatible video unchanged and re-encodes audio.
