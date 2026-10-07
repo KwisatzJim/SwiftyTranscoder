@@ -10,4 +10,4 @@ All 175 tests in 43 suites passed. The release process rebuilt the media tools, 
 
 SHA-256: `7c45cdb426e380fd5157374e94304671b013e9945fff9221448bad101cb87230`.
 
-Local packaging is complete. The user confirmed installed version 1.7.0 and authorized GitHub publication.
+Local packaging is complete. The user confirmed installed version 1.7.0. GitHub publication is complete: the public v1.7.0 release contains the installer, third-party source bundle, and checksums. All remote asset sizes and SHA-256 digests match local files. A fresh source build and release-app verification passed.

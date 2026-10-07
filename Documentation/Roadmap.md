@@ -149,4 +149,4 @@ Ordinary conversion has per-file Original/720p/480p size choices and CLI `--reso
 
 ## 130 — Local 1.7.0 release
 
-Version 1.7.0 (17) packages the accepted lower-resolution choices. All 175 tests, signature/resource/model checks, installer integrity, packaged ordinary/resolution/audio/cancellation checks, and retained-installer checksums passed. The user confirmed installed-version acceptance and authorized publication. See `Milestone-130.md`.
+Version 1.7.0 (17) packages the accepted lower-resolution choices. All 175 tests, signature/resource/model checks, installer integrity, packaged ordinary/resolution/audio/cancellation checks, and retained-installer checksums passed. Installed-version acceptance, GitHub publication, fresh-source verification, and remote asset checksums are complete. See `Milestone-130.md`.

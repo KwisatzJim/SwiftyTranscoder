@@ -87,7 +87,7 @@ swift test
 
 ## Local releases
 
-The arm64 `1.7.0 (17)` installer adds Original/720p/480p output sizes for ordinary conversion, with preserved proportions and no enlargement of smaller sources. Use the GUI Output size picker or CLI `--resolution 720p` / `--resolution 480p`, optionally with `--audio omit`. Its artifact is `dist/SwiftyTranscoder_1.7.0_arm64.dmg`. Automated checks, feature review, and installed-version acceptance passed.
+The arm64 `1.7.0 (17)` installer adds Original/720p/480p output sizes for ordinary conversion, with preserved proportions and no enlargement of smaller sources. Use the GUI Output size picker or CLI `--resolution 720p` / `--resolution 480p`, optionally with `--audio omit`. Its artifact is `dist/SwiftyTranscoder_1.7.0_arm64.dmg`. Automated checks, feature review, and installed-version acceptance passed. Version 1.7.0 is published on GitHub.
 
 The arm64 `1.6.0 (16)` installer adds per-file **Remove all audio** and CLI `--audio omit` for ordinary conversion. It also fixes incorrect player durations caused by malformed chapter lists and detects supported 5.1 audio whose layout appears later in the source. Its artifact is `dist/SwiftyTranscoder_1.6.0_arm64.dmg`. Automated checks, feature playback reviews, and installed-version acceptance passed. Version 1.6.0 is published on GitHub.
 
