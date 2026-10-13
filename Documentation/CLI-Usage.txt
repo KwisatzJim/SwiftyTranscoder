@@ -11,6 +11,7 @@ Examples (assuming the launcher is on PATH):
 swiftytranscoder --help
 swiftytranscoder "/path/to/input.mkv" --preset plex --output "/path/to/output.mp4"
 swiftytranscoder "/path/to/input.mp4" --preset plex --gain-db 6 --output "/path/to/output.mp4"
+swiftytranscoder "/path/to/input.mov" --resolution 720p --output "/path/to/output.mp4"
 
 Use --dry-run to inspect without writing output.
 Smaller ordinary conversion (1.7.0 and later):
@@ -23,7 +24,8 @@ Reducing size uses Apple hardware HEVC; it cannot be combined with AI restoratio
 File size depends on content and duration; these choices do not guarantee an email limit.
 Plex defaults: protected +6 dB gain, primary AC-3, secondary AAC stereo.
 Use --gain-db 0 for already-boosted files to avoid applying gain twice.
-MP4/M4V processing copies compatible video unchanged and re-encodes audio.
+MP4/M4V/MOV processing copies compatible SDR H.264/HEVC video unchanged
+unless resizing is selected, and re-encodes audio.
 Subtitle-bearing inputs require --subtitles omit or --subtitles INDEX.
 Untagged MKV SDR needs --assume-bt709 after confirming its color.
 Existing destinations and partial files are refused; output must end in .mp4.

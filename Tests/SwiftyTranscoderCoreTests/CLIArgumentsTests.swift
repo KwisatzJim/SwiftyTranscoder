@@ -12,6 +12,11 @@ struct CLIArgumentsTests {
         #expect(options.restorationMethod == nil)
     }
 
+    @Test(arguments: ["input.mov", "input.MOV"]) func acceptsMOVInput(_ input: String) throws {
+        let options = try CLIArguments([input, "--output", "output.mp4"])
+        #expect(options.input == input)
+    }
+
     @Test func parsesExplicitChoicesAndDryRun() throws {
         let options = try CLIArguments(["input.mkv", "--output", "output.mp4", "--gain-db", "0",
                                         "--aac-stereo", "off", "--subtitles", "3", "--assume-bt709", "--dry-run"])

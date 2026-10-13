@@ -58,7 +58,8 @@ struct ContentView: View {
 
     private static let sourceTypes: [UTType] = [
         UTType(filenameExtension: "mkv") ?? .data,
-        .mpeg4Movie
+        .mpeg4Movie,
+        .quickTimeMovie
     ]
 
     var body: some View {
@@ -186,7 +187,7 @@ struct ContentView: View {
     private var chooseStep: some View {
         VStack(spacing: 18) {
             Text(selectedSource == nil
-                ? "Choose one or more MKV or MP4 files to begin. Sources will only be read."
+                ? "Choose one or more MKV, MP4, M4V, or MOV files to begin. Sources will only be read."
                 : "Choose a replacement selection, or return to the videos already loaded."
             )
                 .foregroundStyle(.secondary)
@@ -210,7 +211,7 @@ struct ContentView: View {
                     chooseSourceFolder()
                 }
             }
-            Text("Folder selection loads MKV, MP4, and M4V files directly inside the folder, in filename order. Subfolders are not included. A new selection replaces the current queue.")
+            Text("Folder selection loads MKV, MP4, M4V, and MOV files directly inside the folder, in filename order. Subfolders are not included. A new selection replaces the current queue.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -234,7 +235,7 @@ struct ContentView: View {
             do {
                 let videos = try SourceFolderImport.videos(fromDroppedURLs: urls)
                 guard !videos.isEmpty else {
-                    selectionError = "No supported MKV, MP4, or M4V files were found in this drop. Subfolders and symbolic links are excluded."
+                    selectionError = "No supported MKV, MP4, M4V, or MOV files were found in this drop. Subfolders and symbolic links are excluded."
                     return false
                 }
                 handleSelection(.success(videos))
@@ -729,10 +730,10 @@ struct ContentView: View {
             }
 
             let supportedSources = urls.filter {
-                ["mkv", "mp4", "m4v"].contains($0.pathExtension.lowercased())
+                ["mkv", "mp4", "m4v", "mov"].contains($0.pathExtension.lowercased())
             }
             guard supportedSources.count == urls.count else {
-                selectionError = "Every selected source must be an MKV or MP4 file."
+                selectionError = "Every selected source must be an MKV, MP4, M4V, or MOV file."
                 return
             }
 
@@ -764,7 +765,7 @@ struct ContentView: View {
         do {
             let videos = try SourceFolderImport.videos(in: folder)
             guard !videos.isEmpty else {
-                selectionError = "This folder contains no supported MKV, MP4, or M4V video files. Subfolders are not included."
+                selectionError = "This folder contains no supported MKV, MP4, M4V, or MOV video files. Subfolders are not included."
                 return
             }
             handleSelection(.success(videos))

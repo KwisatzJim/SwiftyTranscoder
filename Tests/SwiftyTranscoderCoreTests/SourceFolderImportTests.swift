@@ -8,13 +8,13 @@ struct SourceFolderImportTests {
         let folder = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fm.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? fm.removeItem(at: folder) }
-        let video = folder.appendingPathComponent("Episode 2.mp4")
+        let video = folder.appendingPathComponent("Episode 2.mov")
         try Data().write(to: video)
         try Data().write(to: folder.appendingPathComponent("Episode 10.mkv"))
         let text = folder.appendingPathComponent("notes.txt")
         try Data().write(to: text)
         #expect(try SourceFolderImport.videos(fromDroppedURLs: [folder, video, folder, text, URL(string: "https://example.com/video.mp4")!]).map(\.lastPathComponent)
-                == ["Episode 2.mp4", "Episode 10.mkv"])
+                == ["Episode 2.mov", "Episode 10.mkv"])
         #expect(try SourceFolderImport.videos(fromDroppedURLs: [text]).isEmpty)
     }
 
@@ -23,7 +23,7 @@ struct SourceFolderImportTests {
         let folder = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fm.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? fm.removeItem(at: folder) }
-        for name in ["Episode 10.MKV", "Episode 2.mp4", "Episode 1.m4v", ".hidden.mp4", "notes.txt"] {
+        for name in ["Episode 10.MKV", "Episode 2.mp4", "Episode 1.m4v", "Episode 3.MOV", ".hidden.mp4", "notes.txt"] {
             try Data().write(to: folder.appendingPathComponent(name))
         }
         let nested = folder.appendingPathComponent("directory.mp4")
@@ -32,7 +32,7 @@ struct SourceFolderImportTests {
         try fm.createSymbolicLink(at: folder.appendingPathComponent("alias.mp4"),
                                   withDestinationURL: folder.appendingPathComponent("Episode 2.mp4"))
         #expect(try SourceFolderImport.videos(in: folder).map(\.lastPathComponent)
-                == ["Episode 1.m4v", "Episode 2.mp4", "Episode 10.MKV"])
+                == ["Episode 1.m4v", "Episode 2.mp4", "Episode 3.MOV", "Episode 10.MKV"])
     }
 
     @Test func emptyFolderReturnsNoVideosAndMissingFolderThrows() throws {

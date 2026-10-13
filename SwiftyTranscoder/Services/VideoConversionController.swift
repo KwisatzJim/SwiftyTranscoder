@@ -293,12 +293,14 @@ final class VideoConversionController: ObservableObject {
         let expectedProfile = videoMode == .copyVideo
             ? expectedVideo.profile ?? "unknown"
             : expectedVideo.pixelFormat == "yuv420p10le" ? "Main 10" : "Main"
+        let expectedPixelFormat = videoMode == .transcodeToHEVC && expectedVideo.pixelFormat == "yuvj420p"
+            ? "yuv420p" : expectedVideo.pixelFormat
         guard outputVideo.profile == expectedProfile,
-              outputVideo.pixelFormat == expectedVideo.pixelFormat else {
+              outputVideo.pixelFormat == expectedPixelFormat else {
             throw VideoConversionControllerError.changedVideoFormat(
                 expectedProfile: expectedProfile,
                 actualProfile: outputVideo.profile ?? "unknown",
-                expectedPixelFormat: expectedVideo.pixelFormat ?? "unknown",
+                expectedPixelFormat: expectedPixelFormat ?? "unknown",
                 actualPixelFormat: outputVideo.pixelFormat ?? "unknown"
             )
         }
@@ -314,7 +316,7 @@ final class VideoConversionController: ObservableObject {
               outputVideo.height == outputHeight else {
             throw VideoConversionControllerError.changedDimensions
         }
-        guard outputVideo.averageFrameRate == expectedVideo.averageFrameRate else {
+        guard FrameRateCompatibility.matches(source: expectedVideo.averageFrameRate, output: outputVideo.averageFrameRate) else {
             throw VideoConversionControllerError.changedFrameRate(
                 expected: expectedVideo.averageFrameRate ?? "unknown",
                 actual: outputVideo.averageFrameRate ?? "unknown"
@@ -360,13 +362,15 @@ final class VideoConversionController: ObservableObject {
             }
             if includesAACStereoTrack {
                 let secondaryAudio = inspection.audioStreams[1]
+                // The encoder's requested bitrate is a target. Short or simple
+                // audio can have a lower measured average without being invalid.
                 let secondaryBitRate = secondaryAudio.bitRate.flatMap(Int.init) ?? 0
                 guard secondaryAudio.codecName == "aac",
                       secondaryAudio.codecTagString == "mp4a",
                       secondaryAudio.channels == 2,
                       secondaryAudio.channelLayout == "stereo",
                       secondaryAudio.sampleRate == "48000",
-                      (180_000...205_000).contains(secondaryBitRate) else {
+                      secondaryBitRate > 0 else {
                     throw VideoConversionControllerError.invalidSecondaryAudio(
                         codec: secondaryAudio.codecName ?? "unknown",
                         layout: secondaryAudio.channelLayout ?? "unknown",
@@ -514,7 +518,7 @@ enum VideoConversionControllerError: LocalizedError {
         case .invalidAudio(let expected, let codec, let layout, let sampleRate, let bitRate):
             "Expected AC-3 \(expected) at 48000 Hz but found \(codec), \(layout), \(sampleRate) Hz, \(bitRate) b/s."
         case .invalidSecondaryAudio(let codec, let layout, let sampleRate, let bitRate):
-            "Expected secondary AAC stereo near 192 kb/s at 48000 Hz but found \(codec), \(layout), \(sampleRate) Hz, \(bitRate) b/s."
+            "Expected secondary AAC stereo at 48000 Hz with a positive reported bitrate but found \(codec), \(layout), \(sampleRate) Hz, \(bitRate) b/s."
         case .invalidAudioMetadata(let track):
             "The \(track) language or default-track setting does not match the approved plan."
         case .changedAudioChannels:

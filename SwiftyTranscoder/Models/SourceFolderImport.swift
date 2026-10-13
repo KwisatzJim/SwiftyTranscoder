@@ -9,7 +9,7 @@ enum SourceFolderImport {
             if values.isDirectory == true {
                 candidates += try videos(in: url, fileManager: fileManager)
             } else if values.isRegularFile == true,
-                      ["mkv", "mp4", "m4v"].contains(url.pathExtension.lowercased()) {
+                      ["mkv", "mp4", "m4v", "mov"].contains(url.pathExtension.lowercased()) {
                 candidates.append(url)
             }
         }
@@ -29,7 +29,7 @@ enum SourceFolderImport {
         )
         var seen = Set<URL>()
         return try entries.filter { url in
-            guard ["mkv", "mp4", "m4v"].contains(url.pathExtension.lowercased()) else { return false }
+            guard ["mkv", "mp4", "m4v", "mov"].contains(url.pathExtension.lowercased()) else { return false }
             let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
             guard values.isRegularFile == true, values.isSymbolicLink != true else { return false }
             return seen.insert(url.standardizedFileURL.resolvingSymlinksInPath()).inserted

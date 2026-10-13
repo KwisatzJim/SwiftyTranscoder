@@ -25,13 +25,15 @@ Use `--dry-run` to inspect and print the plan without creating output. Sources c
 
 The launcher defaults to `/Applications/SwiftyTranscoder.app` when the override is absent. Do not target the older 1.1.0 bundle for CLI use. Packaging does not install the app, modify your shell settings, or install a system command automatically.
 
-The source MKV is always read-only. Conversion is written to a clearly named `.partial.mp4`, independently validated, and only then promoted to the final `.mp4` filename.
+Source files are always read-only. Conversion is written to a clearly named `.partial.mp4`, independently validated, and only then promoted to the final `.mp4` filename.
 
 ## Current capabilities
 
+MOV input is supported through the file picker, drag-and-drop, folder import, and command line. Like MP4/M4V, MOV requires compatible SDR H.264/HEVC video; source video is copied unless resizing is selected. Output remains MP4.
+
 - Inspect MKV video, audio, subtitles, chapters, attachments, duration, size, and bitrate with `ffprobe`.
 - Convert H.264 and HEVC SDR sources to hardware-encoded HEVC MP4 with the Apple-compatible `hvc1` tag.
-- Accept compatible MP4/M4V sources for audio-only processing while copying their video stream unchanged.
+- Accept compatible MP4/M4V/MOV sources for audio-only processing while copying their video stream unchanged.
 - Preserve source resolution, aspect ratio, frame rate, chapters, and useful metadata without automatic upscaling, cropping, denoising, or sharpening.
 - Preserve 8-bit SDR as HEVC Main and supported 10-bit SDR as HEVC Main10.
 - Preserve mono, stereo, or 5.1 channel layout while creating Plex-friendly 48 kHz AC-3 audio.

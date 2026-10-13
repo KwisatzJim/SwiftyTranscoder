@@ -62,7 +62,7 @@ struct VideoConversionCommand: Sendable {
         bundleURL: URL = Bundle.main.bundleURL,
         fileManager: FileManager = .default
     ) throws {
-        let isMP4Source = ["mp4", "m4v"].contains(sourceURL.pathExtension.lowercased())
+        let isMP4Source = ["mp4", "m4v", "mov"].contains(sourceURL.pathExtension.lowercased())
         guard let video = inspection.videoStreams.first else {
             throw VideoConversionCommandError.noVideo(file: sourceURL.lastPathComponent)
         }
@@ -80,7 +80,7 @@ struct VideoConversionCommand: Sendable {
             )
         }
 
-        guard ["yuv420p", "yuv420p10le"].contains(video.pixelFormat) else {
+        guard ["yuv420p", "yuvj420p", "yuv420p10le"].contains(video.pixelFormat) else {
             throw VideoConversionCommandError.unsupportedPixelFormat(
                 file: sourceURL.lastPathComponent,
                 pixelFormat: video.pixelFormat ?? "unknown"
@@ -169,8 +169,17 @@ struct VideoConversionCommand: Sendable {
             videoFilters.append("setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709")
         }
 
+        // JPEG-style 4:2:0 uses full range. Copying preserves it; encoding
+        // converts the samples to limited range before hardware HEVC encoding.
+        let convertsFullRange = videoMode == .transcodeToHEVC && video.pixelFormat == "yuvj420p"
         if scalesVideo, let outputWidth, let outputHeight {
-            videoFilters.append("scale=\(outputWidth):\(outputHeight):flags=lanczos")
+            let rangeOptions = convertsFullRange ? ":in_range=full:out_range=limited" : ""
+            videoFilters.append("scale=\(outputWidth):\(outputHeight):flags=lanczos\(rangeOptions)")
+        } else if convertsFullRange {
+            videoFilters.append("scale=in_range=full:out_range=limited")
+        }
+        if convertsFullRange {
+            videoFilters.append("format=yuv420p,setparams=range=limited")
         }
 
         let quality = (video.height ?? 0) > 1_080 ? "50" : "60"
@@ -306,7 +315,7 @@ enum VideoConversionCommandError: LocalizedError {
         case .unsupportedCodec(let file, let codec):
             "\(file) uses unsupported video codec \(codec). The first conversion path supports H.264 and HEVC only."
         case .unsupportedPixelFormat(let file, let pixelFormat):
-            "\(file) uses \(pixelFormat). Conversion supports confirmed SDR yuv420p and yuv420p10le sources only."
+            "\(file) uses \(pixelFormat). Conversion supports confirmed SDR yuv420p, yuvj420p (full range), and yuv420p10le sources only."
         case .unconfirmedColor(let file):
             "\(file) is not explicitly identified as SDR. Conversion is blocked to avoid losing or changing important color information."
         case .outputNotSelected:

@@ -88,8 +88,8 @@ struct CLIArguments: Equatable, Sendable {
         guard let input, !input.isEmpty, let output, !output.isEmpty else {
             throw CLIUsageError("An input file and --output are required. Use --help for usage.")
         }
-        guard ["mkv", "mp4", "m4v"].contains(URL(fileURLWithPath: input).pathExtension.lowercased()) else {
-            throw CLIUsageError("Input must be MKV, MP4, or M4V.")
+        guard ["mkv", "mp4", "m4v", "mov"].contains(URL(fileURLWithPath: input).pathExtension.lowercased()) else {
+            throw CLIUsageError("Input must be MKV, MP4, M4V, or MOV.")
         }
         guard URL(fileURLWithPath: output).pathExtension.lowercased() == "mp4" else {
             throw CLIUsageError("Output must have the .mp4 extension.")
@@ -103,9 +103,9 @@ struct CLIArguments: Equatable, Sendable {
 
     static let usage = """
     Usage: swiftytranscoder INPUT --preset plex --output OUTPUT.mp4 [options]
-    Input: MKV, or compatible SDR H.264/HEVC MP4/M4V.
+    Input: MKV, or compatible SDR H.264/HEVC MP4/M4V/MOV.
     Plex defaults: protected +6 dB gain, primary AC-3, optional AAC stereo on.
-    By default, MP4/M4V video is copied; MKV video uses hardware HEVC.
+    By default, MP4/M4V/MOV video is copied; MKV video uses hardware HEVC.
     --restore lightweight enables explicit AI restoration with hardware HEVC output.
 
       --restore lightweight   Restore eligible tagged SDR video using FSRCNN
