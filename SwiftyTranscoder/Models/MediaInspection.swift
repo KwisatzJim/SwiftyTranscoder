@@ -7,6 +7,18 @@ struct MediaInspection: Decodable, Sendable {
 
     var videoStreams: [MediaStream] { streams.filter { $0.codecType == "video" } }
     var audioStreams: [MediaStream] { streams.filter { $0.codecType == "audio" } }
+    // Prefer English even when another language is first or marked default.
+    // Preserve source order among English tracks and when no English is tagged.
+    var preferredAudioStream: MediaStream? {
+        audioStreams.first { stream in
+            let language = (stream.tags?["language"] ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            return ["eng", "en"].contains(language)
+                || language.hasPrefix("en-")
+        } ?? audioStreams.first
+    }
+
     var subtitleStreams: [MediaStream] { streams.filter { $0.codecType == "subtitle" } }
     var attachmentStreams: [MediaStream] { streams.filter { $0.codecType == "attachment" } }
 

@@ -34,7 +34,7 @@ enum CommandLineRunner {
                   duration.isFinite, duration > 0 else {
                 throw CLIUsageError("Input requires video and a valid duration.")
             }
-            let audio = inspection.audioStreams.first
+            let audio = inspection.preferredAudioStream
             var color = ColorSelection(video: video)
             if options.assumeBT709 {
                 guard source.pathExtension.lowercased() == "mkv", color == .needsConfirmation else {

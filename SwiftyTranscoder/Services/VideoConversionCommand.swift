@@ -95,7 +95,7 @@ struct VideoConversionCommand: Sendable {
             )
         }
 
-        let audio = inspection.audioStreams.first
+        let audio = inspection.preferredAudioStream
         let audioSettings = audio.flatMap(CompatibilityAudioSettings.init(source:))
         if audioMode == .convert {
             guard let audio else { throw VideoConversionCommandError.noAudio(file: sourceURL.lastPathComponent) }
@@ -205,9 +205,9 @@ struct VideoConversionCommand: Sendable {
             "-sn",
             "-dn",
         ]
-        if audioMode == .convert {
-            arguments += ["-map", "0:a:0"]
-            if aacStereoEnabled { arguments += ["-map", "0:a:0"] }
+        if audioMode == .convert, let audio {
+            arguments += ["-map", "0:\(audio.index)"]
+            if aacStereoEnabled { arguments += ["-map", "0:\(audio.index)"] }
         } else { arguments += ["-an"] }
         if !videoFilters.isEmpty {
             arguments += ["-vf", videoFilters.joined(separator: ",")]

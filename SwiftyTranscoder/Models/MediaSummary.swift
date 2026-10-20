@@ -8,11 +8,11 @@ struct MediaSummary: Sendable {
 
     init(inspection: MediaInspection) {
         video = inspection.videoStreams.first.map(VideoSummary.init)
-        audio = inspection.audioStreams.first.map(AudioSummary.init)
+        audio = inspection.preferredAudioStream.map(AudioSummary.init)
         subtitleCount = inspection.subtitleStreams.count
         subtitleRecommendation = SubtitleRecommendationEngine().recommend(
             from: inspection.subtitleStreams,
-            primaryAudio: inspection.audioStreams.first
+            primaryAudio: inspection.preferredAudioStream
         )
     }
 }

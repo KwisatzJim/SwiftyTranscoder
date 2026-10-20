@@ -48,7 +48,7 @@ struct ConversionPlan: Sendable {
         frameRate = summary.video.map { "Preserve source (\($0.frameRate))" }
             ?? "Unknown—conversion blocked"
         colorHandling = colorSelection.description
-        let primaryAudioFormat = inspection.audioStreams.first
+        let primaryAudioFormat = inspection.preferredAudioStream
             .flatMap(CompatibilityAudioSettings.init(source:))
             .map { "AC-3 \($0.description), 48 kHz; preserve channel layout" }
             ?? "Unsupported audio layout—conversion blocked"

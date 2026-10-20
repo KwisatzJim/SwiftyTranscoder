@@ -36,7 +36,7 @@ final class RestorationPreviewController: ObservableObject {
         aacStereoEnabled: Bool
     ) {
         guard !isActive else { return }
-        guard let sourceAudio = inspection.audioStreams.first else {
+        guard let sourceAudio = inspection.preferredAudioStream else {
             phase = .failed("AI restoration preview requires a primary audio stream.")
             return
         }

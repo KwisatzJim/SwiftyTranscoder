@@ -201,7 +201,7 @@ final class FullVideoRestorationController: ObservableObject {
               ) else {
             throw FullVideoRestorationControllerError.invalidDurationOrSize
         }
-        guard let sourceAudio = inspection.audioStreams.first else {
+        guard let sourceAudio = inspection.preferredAudioStream else {
             throw FullVideoRestorationControllerError.missingAudio
         }
         let subtitleStreamOrdinal: Int?

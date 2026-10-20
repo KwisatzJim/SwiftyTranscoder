@@ -894,7 +894,7 @@ struct ContentView: View {
                 let recommendedSelection = SubtitleSelection(
                     recommendation: SubtitleRecommendationEngine().recommend(
                         from: result.subtitleStreams,
-                        primaryAudio: result.audioStreams.first
+                        primaryAudio: result.preferredAudioStream
                     )
                 )
                 subtitleSelection = defaultSubtitleMode == "omit"
@@ -996,7 +996,7 @@ struct ContentView: View {
             try conversionController.start(
                 command: command,
                 expectedVideo: expectedVideo,
-                expectedAudio: inspection.audioStreams.first,
+                expectedAudio: inspection.preferredAudioStream,
                 videoMode: command.videoMode,
                 colorSelection: colorSelection,
                 durationSeconds: duration
