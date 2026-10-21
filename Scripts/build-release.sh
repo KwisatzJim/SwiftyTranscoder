@@ -5,9 +5,11 @@ set -euo pipefail
 usage() {
     echo "Usage: Scripts/build-release.sh [--force]"
     echo ""
-    echo "Builds, verifies, and packages a local ad-hoc-signed release DMG."
+    echo "Builds, verifies, and packages a Developer ID-signed release DMG (not notarized)."
     echo "Use --force to replace an existing DMG for the same version."
 }
+
+signing_identity="${SWIFTYTRANSCODER_SIGNING_IDENTITY:-Developer ID Application}"
 
 force=0
 case "${1:-}" in
@@ -68,8 +70,7 @@ xcodebuild \
     -destination 'platform=macOS' \
     -derivedDataPath "$derived_data" \
     CODE_SIGN_STYLE=Manual \
-    CODE_SIGN_IDENTITY=- \
-    DEVELOPMENT_TEAM= \
+    CODE_SIGN_IDENTITY="$signing_identity" \
     build
 
 app_path="$derived_data/Build/Products/Release/SwiftyTranscoder.app"

@@ -6,7 +6,7 @@ SwiftyTranscoder is a native macOS SwiftUI application for turning MKV and compa
 
 Download **SwiftyTranscoder_1.7.0_arm64.dmg** from [the latest release](https://github.com/KwisatzJim/SwiftyTranscoder/releases/latest), open it, and drag the app to **Applications**. Requires an Apple Silicon Mac running macOS 14 or later.
 
-This personal release is signed locally and is not Apple-notarized. If macOS blocks the first launch, use **System Settings → Privacy & Security → Open Anyway** after confirming the download came from this repository. The release includes a SHA-256 checksum, its CLI launcher, and usage instructions. FFmpeg and the AI models are bundled; Python and Homebrew are not required to run the app.
+The latest release is signed with Developer ID and notarized by Apple, with the notarization ticket attached for offline verification. Installation and conversion were also confirmed on a second Mac (Neo). The release includes a SHA-256 checksum, its CLI launcher, and usage instructions. FFmpeg and the AI models are bundled; Python and Homebrew are not required to run the app.
 
 ## Command-line interface
 
@@ -88,6 +88,10 @@ swift test
 ```
 
 ## Local releases
+
+The `v1.7.0-notarized` release packages the verified Developer ID-signed, Apple-notarized `1.7.0 (17)` app. It also includes the English-first audio selection fix and MOV input support added after the original v1.7.0 release. The earlier release remains available. The DMG itself is Developer ID-signed; the app inside carries Apple's notarization ticket.
+
+Release builds now use a Developer ID Application certificate and secure signing timestamps for the app and bundled helpers. `Scripts/build-release.sh` builds a signed DMG but does **not** notarize it. To notarize with Xcode, archive for Apple Silicon (`ARCHS=arm64`), use Organizer's Direct Distribution workflow, and export the notarized app. Package that exported app without rebuilding or modifying it, then verify its ticket with `xcrun stapler validate` and Gatekeeper acceptance with `spctl --assess --type execute`. A new build requires its own notarization.
 
 The arm64 `1.7.0 (17)` installer adds Original/720p/480p output sizes for ordinary conversion, with preserved proportions and no enlargement of smaller sources. Use the GUI Output size picker or CLI `--resolution 720p` / `--resolution 480p`, optionally with `--audio omit`. Its artifact is `dist/SwiftyTranscoder_1.7.0_arm64.dmg`. Automated checks, feature review, and installed-version acceptance passed. Version 1.7.0 is published on GitHub.
 

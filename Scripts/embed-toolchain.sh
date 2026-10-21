@@ -74,7 +74,11 @@ for helper in ffmpeg ffprobe; do
     destination="$helpers_destination/$helper"
     cp "$helpers_source/$helper" "$destination"
     chmod 755 "$destination"
-    codesign --force --sign "$signing_identity" --options runtime --timestamp=none "$destination"
+    if [[ "$signing_identity" == "-" ]]; then
+        codesign --force --sign "$signing_identity" --options runtime --timestamp=none "$destination"
+    else
+        codesign --force --sign "$signing_identity" --options runtime --timestamp "$destination"
+    fi
 done
 
 cp "$licenses_source/freetype/LICENSE.TXT" "$notices_destination/FreeType-LICENSE.txt"
