@@ -36,6 +36,7 @@ struct ContentView: View {
     @State private var selectedSource: URL?
     @State private var inspection: MediaInspection?
     @State private var isInspecting = false
+    @State private var inspectionRequestID = UUID()
     @State private var selectionError: String?
     @State private var notificationError: String?
     @State private var queueIndexPendingRemoval: Int?
@@ -44,6 +45,8 @@ struct ContentView: View {
     @State private var gainEnabled = true
     @State private var aacStereoEnabled = false
     @State private var colorSelection = ColorSelection.needsConfirmation
+    @State private var colorConfirmationIdentity: ColorConfirmationIdentity?
+    @State private var hasSavedColorConfirmation = false
     @State private var subtitleSelection = SubtitleSelection.needsChoice
     @State private var outputURL: URL?
     @State private var isRestorationPreviewActive = false
@@ -645,13 +648,41 @@ struct ContentView: View {
                 outputResolution: $outputResolution,
                 gainEnabled: $gainEnabled,
                 aacStereoEnabled: $aacStereoEnabled,
-                colorSelection: $colorSelection,
+                colorSelection: Binding(get: { colorSelection }, set: { selection in
+                    colorSelection = selection
+                    guard let identity = colorConfirmationIdentity else { return }
+                    if selection == .confirmUntaggedAsBT709 {
+                        SavedColorConfirmation().remember(identity)
+                        hasSavedColorConfirmation = true
+                    } else {
+                        SavedColorConfirmation().forget(identity)
+                        hasSavedColorConfirmation = false
+                    }
+                }),
                 subtitleSelection: $subtitleSelection,
                 outputURL: $outputURL,
                 savedOutputFolderPath: $savedOutputFolderPath,
                 saveDefaults: saveCurrentDefaults
             )
             .disabled(isBatchRunning || isBatchReady || isRestorationPreviewActive)
+
+            if colorConfirmationIdentity != nil {
+                if hasSavedColorConfirmation {
+                    HStack {
+                        Text("Using your saved SDR/BT.709 confirmation for this exact file.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Button("Forget Saved SDR Confirmation") {
+                            if let identity = colorConfirmationIdentity { SavedColorConfirmation().forget(identity) }
+                            hasSavedColorConfirmation = false
+                            colorSelection = .needsConfirmation
+                        }
+                    }
+                    .disabled(isBatchRunning || isBatchReady || isRestorationPreviewActive)
+                } else {
+                    Text("Confirming SDR will remember that choice for this exact file. A changed file will require confirmation again.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
 
             if let restorationPlan {
                 RestorationPlanChoiceView(
@@ -850,6 +881,8 @@ struct ContentView: View {
         gainEnabled = defaultGainEnabled
         aacStereoEnabled = defaultAACStereoEnabled
         colorSelection = .needsConfirmation
+        colorConfirmationIdentity = nil
+        hasSavedColorConfirmation = false
         subtitleSelection = .needsChoice
         outputURL = nil
         restorationEnabled = false
@@ -880,17 +913,32 @@ struct ContentView: View {
     }
 
     private func inspect(_ source: URL) {
+        let requestID = UUID()
+        inspectionRequestID = requestID
         isInspecting = true
 
         Task {
-            defer { isInspecting = false }
+            defer {
+                if inspectionRequestID == requestID { isInspecting = false }
+            }
 
             do {
                 let probe = try MediaProbe()
                 let result = try await probe.inspect(source)
+                let detectedColor = ColorSelection(video: result.videoStreams.first)
+                // Explicit HDR or conflicting evidence always takes precedence over saved assumptions.
+                let identity: ColorConfirmationIdentity?
+                if detectedColor == .needsConfirmation, result.videoStreams.first?.colorTransfer != "conflicting" {
+                    identity = try? await ColorConfirmationIdentity.read(source)
+                } else {
+                    identity = nil
+                }
+                guard inspectionRequestID == requestID, selectedSource == source else { return }
                 inspection = result
                 removeAudio = result.audioStreams.isEmpty
-                colorSelection = ColorSelection(video: result.videoStreams.first)
+                colorConfirmationIdentity = identity
+                hasSavedColorConfirmation = identity.map { SavedColorConfirmation().isConfirmed($0) } ?? false
+                colorSelection = hasSavedColorConfirmation ? .confirmUntaggedAsBT709 : detectedColor
                 let recommendedSelection = SubtitleSelection(
                     recommendation: SubtitleRecommendationEngine().recommend(
                         from: result.subtitleStreams,
@@ -901,6 +949,7 @@ struct ContentView: View {
                     ? .omit
                     : recommendedSelection
             } catch {
+                guard inspectionRequestID == requestID, selectedSource == source else { return }
                 inspection = nil
                 selectionError = error.localizedDescription
             }
@@ -1106,6 +1155,11 @@ struct ContentView: View {
 
     private func restoreApprovedPlan(_ approved: ApprovedConversion) {
         selectedSource = approved.sourceURL
+        // This snapshot may belong to a different queue item; never keep another file's identity.
+        inspectionRequestID = UUID()
+        isInspecting = false
+        colorConfirmationIdentity = nil
+        hasSavedColorConfirmation = false
         inspection = approved.inspection
         outputURL = approved.outputURL
         gainEnabled = approved.gainEnabled
@@ -1240,6 +1294,11 @@ struct ContentView: View {
         }
         currentQueueIndex = index
         selectedSource = approved.sourceURL
+        // This snapshot may belong to a different queue item; never keep another file's identity.
+        inspectionRequestID = UUID()
+        isInspecting = false
+        colorConfirmationIdentity = nil
+        hasSavedColorConfirmation = false
         inspection = approved.inspection
         outputURL = approved.outputURL
         gainEnabled = approved.gainEnabled

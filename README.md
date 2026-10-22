@@ -4,7 +4,7 @@ SwiftyTranscoder is a native macOS SwiftUI application for turning MKV and compa
 
 ## Download and install
 
-Download **SwiftyTranscoder_1.7.0_arm64.dmg** from [the latest release](https://github.com/KwisatzJim/SwiftyTranscoder/releases/latest), open it, and drag the app to **Applications**. Requires an Apple Silicon Mac running macOS 14 or later.
+Download **SwiftyTranscoder_1.8.0_arm64.dmg** from [the latest release](https://github.com/KwisatzJim/SwiftyTranscoder/releases/latest), open it, and drag the app to **Applications**. Requires an Apple Silicon Mac running macOS 14 or later.
 
 The latest release is signed with Developer ID and notarized by Apple, with the notarization ticket attached for offline verification. Installation and conversion were also confirmed on a second Mac (Neo). The release includes a SHA-256 checksum, its CLI launcher, and usage instructions. FFmpeg and the AI models are bundled; Python and Homebrew are not required to run the app.
 
@@ -53,6 +53,20 @@ MOV input is supported through the file picker, drag-and-drop, folder import, an
 - Opt-in single-video resume preserves verified completed blocks after cancellation or a force quit; it is available in the GUI and CLI.
 - Restoration progress, measured remaining-time estimates, elapsed time, and average speed. AI remains off by default.
 
+## Conversion assistant and color confirmation (1.8.0)
+
+Version 1.8.0 adds the conversion assistant, deeper color inspection, and saved file-specific SDR confirmation.
+
+**Help Choose Settings…** in the conversion plan provides advice for manual review. The request “Make this smaller for Plex” uses the app’s sizing rules: propose 720p if it reduces the current planned dimensions, otherwise try 480p. It never enlarges the source and cannot guarantee a particular file size. Current audio and color settings are listed separately and remain unchanged. Other requests currently produce output-size advice only; the assistant cannot apply settings or start conversion.
+
+**Explain Error** appears after an ordinary conversion failure. It opens a window where a second **Explain Error** button asks Apple’s on-device model to explain the displayed diagnostic and suggest one safe next step. Model-generated advice can be wrong. The window shows the diagnostic or plan summary supplied to the model; video frames are not sent to this assistant. There is no cloud-model fallback.
+
+Model-generated advice requires macOS 26 or later, an Apple Intelligence-capable Mac, Apple Intelligence enabled, and its on-device model ready. Common sizing requests use fixed app rules and also work without Apple Intelligence. The app’s existing macOS 14 minimum remains unchanged.
+
+When the primary video stream has incomplete transfer, primaries, or matrix tags, inspection samples decoded-frame metadata using seek points at the beginning, 50%, and 90% of the video. Very short videos or unknown durations use a beginning-only sample. Each interval is limited to 48 packets, and the supplemental check has a 12-second deadline before termination is requested. Seeking may land on earlier keyframes. Consistent explicit tags can fill missing fields; HDR indicators block SDR handling, and conflicting tags prevent automatic classification. This is metadata sampling, not visual AI detection or proof about every frame. Missing information stays unknown.
+
+For an untagged source accepted by the ordinary conversion workflow, choosing **I confirmed SDR — tag as BT.709** saves that decision locally for the exact file. Reloading it restores the choice only when its canonical path, size, modification date, file identifier, and full SHA-256 checksum match. Checking the checksum reads the entire file and can slow inspection of large untagged sources. Saved choices do not override detected HDR or conflicting color tags. **Forget Saved SDR Confirmation** clears the saved choice and restores the confirmation requirement. These saved choices are GUI-only; the CLI still requires its explicit color option. Confirming SDR does not establish that BT.709 is correct for all sources, especially older standard-definition material.
+
 ## Requirements
 
 - macOS 14 or later
@@ -88,6 +102,8 @@ swift test
 ```
 
 ## Local releases
+
+Version 1.8.0 (18) adds reviewed sizing advice, on-device error explanations, bounded three-point color metadata inspection, and checksum-bound saved SDR confirmations. It also fixes Xcode GUI launch arguments, sandboxed packaging, and stale inspection updates. See [1.8.0 release notes](Documentation/Release-1.8.0.md). New builds require fresh notarization; the 1.7.0 ticket does not cover 1.8.0.
 
 The `v1.7.0-notarized` release packages the verified Developer ID-signed, Apple-notarized `1.7.0 (17)` app. It also includes the English-first audio selection fix and MOV input support added after the original v1.7.0 release. The earlier release remains available. The DMG itself is Developer ID-signed; the app inside carries Apple's notarization ticket.
 
@@ -138,7 +154,7 @@ Before a reviewed batch can start, SwiftyTranscoder adds the conservative requir
 
 Multi-file queues can optionally send a macOS notification when the batch completes, fails, or is cancelled. This is off by default and requires SwiftyTranscoder to be allowed in **System Settings → Notifications**.
 
-The conversion plan can remember gain, optional AAC stereo compatibility audio, and subtitle-policy defaults across sources and app launches. Use **Save Conversion Defaults** after choosing these settings. Specific subtitle stream numbers and color confirmations are always source-specific and are never reused.
+The conversion plan can remember gain, optional AAC stereo compatibility audio, and subtitle-policy defaults across sources and app launches. Use **Save Conversion Defaults** after choosing these settings. Specific subtitle stream numbers are never reused. Color confirmations are separate from defaults: the GUI remembers SDR confirmation only for the exact unchanged source file, as described above.
 
 Use **Choose Folder…** to load the MKV, MP4, and M4V files directly inside a folder in filename order. Hidden files, symbolic links, and subfolders are excluded. You can also drag videos or folders from Finder onto the Choose screen; mixed drops skip duplicate paths and unsupported files. A new selection replaces the current queue; all plans still require review before conversion.
 
@@ -159,7 +175,7 @@ Use **Choose Folder…** to load the MKV, MP4, and M4V files directly inside a f
 ## Intentional limitations
 
 - HDR, HLG, Dolby Vision, and unknown color are never silently converted to SDR.
-- Missing color metadata requires the user to confirm that the source is SDR; the app labels the output BT.709 but does not transform the image colors.
+- If deeper inspection cannot identify the color metadata, supported untagged MKV conversion requires explicit SDR/BT.709 confirmation (or a matching saved confirmation in the GUI). This labels the output; it does not reconstruct missing color information or perform HDR-to-SDR tone mapping. Untagged MP4/M4V/MOV remains blocked by the existing ordinary-conversion checks.
 - Atmos and DTS are not preserved as advanced formats when converted to ordinary AC-3 compatibility audio.
 - PGS/VobSub burn-in and subtitle OCR are not implemented.
 - Selectable MP4 subtitle output is not implemented; supported subtitles are either burned in or omitted.

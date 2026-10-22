@@ -49,6 +49,17 @@ if [[ ! -d "$model_source" || ! -f "$model_license_source" ]]; then
     exit 1
 fi
 
+# Copy the three verified package files directly. ditto creates randomly named
+# temporary files when replacing a package, which cannot be declared to Xcode.
+copy_verified_model() {
+    local source="$1"
+    local destination="$2"
+    mkdir -p "$destination/Data/com.apple.CoreML/weights"
+    cp "$source/Manifest.json" "$destination/Manifest.json"
+    cp "$source/Data/com.apple.CoreML/model.mlmodel" "$destination/Data/com.apple.CoreML/model.mlmodel"
+    cp "$source/Data/com.apple.CoreML/weights/weight.bin" "$destination/Data/com.apple.CoreML/weights/weight.bin"
+}
+
 verify_checksum() {
     local expected="$1"
     local file="$2"
@@ -88,8 +99,8 @@ cp "$licenses_source/libass/COPYING" "$notices_destination/libass-COPYING.txt"
 cp "$ffmpeg_licenses_source/COPYING.LGPLv2.1" "$notices_destination/FFmpeg-COPYING.LGPLv2.1.txt"
 cp "$ffmpeg_licenses_source/LICENSE.md" "$notices_destination/FFmpeg-LICENSE.md"
 cp "$model_license_source" "$notices_destination/Real-ESRGAN-LICENSE.txt"
-ditto "$model_source" "$model_destination"
-ditto "$sd_model_source" "$sd_model_destination"
+copy_verified_model "$model_source" "$model_destination"
+copy_verified_model "$sd_model_source" "$sd_model_destination"
 
 # Accepted model choices are required in every app build, including releases.
 fast_name="RealESRGAN_general_x2_522_fp16.mlpackage"
@@ -102,7 +113,7 @@ fi
     verify_checksum "9878f924115d8c8e78610fc4b00029d827750bc0d96e9fb57eda9d6c1d540402" "$fast_source/Manifest.json"
     verify_checksum "f73dbe79485ee9ba81aede548a18fec2d39969f0b3ea5fc3f4e982bd5de22ded" "$fast_source/Data/com.apple.CoreML/model.mlmodel"
     verify_checksum "7a6088b2ee537938f380b9049fae2b85dad57b251d047ab8f5afd256417838ec" "$fast_source/Data/com.apple.CoreML/weights/weight.bin"
-    ditto "$fast_source" "$app_contents/Resources/Models/$fast_name"
+    copy_verified_model "$fast_source" "$app_contents/Resources/Models/$fast_name"
 }
 
 lightweight_name="FSRCNN_x2_RGB_522_fp16.mlpackage"
@@ -117,7 +128,7 @@ fi
     verify_checksum "77e39276f595f522674022564346090bcd6fc17134dabd7ef3877c03fc9f531c" "$lightweight_source/Data/com.apple.CoreML/model.mlmodel"
     verify_checksum "d21b1ae5f2959fa4ea86fe69aa880fc71aefe612cef7a41efbb04e46716dbb60" "$lightweight_source/Data/com.apple.CoreML/weights/weight.bin"
     verify_checksum "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4" "$lightweight_root/LICENSE"
-    ditto "$lightweight_source" "$app_contents/Resources/Models/$lightweight_name"
+    copy_verified_model "$lightweight_source" "$app_contents/Resources/Models/$lightweight_name"
     cp "$lightweight_root/LICENSE" "$notices_destination/FSRCNN-LICENSE.txt"
     echo "FSRCNN x2 weights: Saafke/FSRCNN_Tensorflow, https://github.com/Saafke/FSRCNN_Tensorflow. RGB Core ML adaptation by SwiftyTranscoder." > "$notices_destination/FSRCNN-Attribution.txt"
 }

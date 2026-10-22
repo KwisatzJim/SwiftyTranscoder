@@ -3,6 +3,8 @@ import Foundation
 struct ConversionPlan: Sendable {
     let container = "MP4"
     let videoFormat: String
+    let sourceWidth: Int
+    let sourceHeight: Int
     let videoDimensions: String
     let frameRate: String
     let colorHandling: String
@@ -32,6 +34,8 @@ struct ConversionPlan: Sendable {
         let summary = MediaSummary(inspection: inspection)
         let isMP4Source = inspection.format.formatName?.lowercased().contains("mp4") == true
         let video = inspection.videoStreams.first
+        sourceWidth = video?.width ?? 0
+        sourceHeight = video?.height ?? 0
         let dimensions = outputResolution.dimensions(width: video?.width ?? 0, height: video?.height ?? 0)
         let scalesVideo = dimensions != nil && (dimensions?.width != video?.width || dimensions?.height != video?.height)
         videoFormat = restorationPlan.map {
@@ -135,7 +139,7 @@ enum ColorSelection: Hashable, Sendable {
         }
         switch VideoSummary(stream: video).dynamicRange {
         case "SDR": self = .preserveConfirmedSDR
-        case "HDR (PQ)", "HDR (HLG)": self = .unsupportedHDR
+        case "HDR (PQ)", "HDR (HLG)", "HDR (metadata)": self = .unsupportedHDR
         default: self = .needsConfirmation
         }
     }

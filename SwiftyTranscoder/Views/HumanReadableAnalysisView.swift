@@ -12,6 +12,9 @@ struct HumanReadableAnalysisView: View {
             Text("Source overview")
                 .font(.title2.bold())
 
+            if let note = inspection.videoStreams.first?.colorInspectionNote {
+                Text(note).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+            }
             HStack(alignment: .top, spacing: 12) {
                 if let video = summary.video {
                     summaryCard(title: "Video", systemImage: "film") {

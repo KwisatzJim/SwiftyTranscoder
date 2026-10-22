@@ -50,7 +50,8 @@ struct VideoSummary: Sendable {
     }
 
     private static func classifyDynamicRange(_ stream: MediaStream) -> String {
-        switch stream.colorTransfer?.lowercased() {
+        if stream.sideDataList?.contains(where: \.indicatesHDR) == true { return "HDR (metadata)" }
+        return switch stream.colorTransfer?.lowercased() {
         case "smpte2084": "HDR (PQ)"
         case "arib-std-b67": "HDR (HLG)"
         case "bt709", "iec61966-2-1", "smpte170m", "gamma22", "gamma28": "SDR"

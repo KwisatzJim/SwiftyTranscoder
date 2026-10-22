@@ -18,10 +18,12 @@ struct ConversionPlanView: View {
     @Binding var savedOutputFolderPath: String
     let saveDefaults: () -> Void
     @State private var defaultsSaved = false
+    @State private var showingAssistant = false
 
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 8) {
+                Button("Help Choose Settings…", systemImage: "sparkles") { showingAssistant = true }
                 Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 6) {
                     planRow("Container", plan.container)
                     planRow("Video", plan.videoFormat)
@@ -150,7 +152,7 @@ struct ConversionPlanView: View {
                             .foregroundStyle(.green)
                     }
                 }
-                Text("Future sources will reuse the gain and AAC stereo settings, and either automatic subtitle recommendations or Omit subtitles. Specific tracks and color confirmations are never reused.")
+                Text("Future sources will reuse the gain and AAC stereo settings, and either automatic subtitle recommendations or Omit subtitles. Specific subtitle tracks are never reused. SDR confirmation is remembered separately for the exact unchanged file.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -169,6 +171,29 @@ struct ConversionPlanView: View {
                 .font(.headline)
         }
         .frame(maxWidth: 760)
+        .sheet(isPresented: $showingAssistant) {
+            ConversionAssistantView(context: """
+                Video: \(plan.videoFormat)
+                Dimensions: \(plan.videoDimensions)
+                Frame rate: \(plan.frameRate)
+                Color: \(plan.colorHandling)
+                Remove all audio selected: \(removeAudio)
+                Audio: \(plan.audioFormat)
+                Gain: \(plan.audioGain)
+                Output size selection: \(outputResolution.label)
+                Ordinary resizing and audio-removal controls available: \(allowsAudioRemoval)
+                Warnings: \(plan.warnings.joined(separator: "; "))
+                """, errorExplanation: false, currentSettings: """
+                Output size: \(outputResolution.label)
+                Remove all audio: \(removeAudio ? "On" : "Off — keep audio")
+                Audio: \(plan.audioFormat)
+                Gain: \(plan.audioGain)
+                Color: \(plan.colorHandling)
+                """, smallerOutputRecommendation: SmallerOutputAdvice.recommendation(
+                    width: plan.sourceWidth, height: plan.sourceHeight,
+                    current: outputResolution, allowsResizing: allowsAudioRemoval
+                ))
+        }
         .onChange(of: gainEnabled) { _, _ in defaultsSaved = false }
         .onChange(of: aacStereoEnabled) { _, _ in defaultsSaved = false }
         .onChange(of: subtitleSelection) { _, _ in defaultsSaved = false }

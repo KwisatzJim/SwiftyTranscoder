@@ -52,7 +52,8 @@ struct RestorationPlanner: Sendable {
         guard let frameRate = video.averageFrameRate, Self.isValidFrameRate(frameRate) else {
             return .unavailable("AI restoration requires a known, valid frame rate.")
         }
-        guard video.colorRange?.lowercased() == "tv",
+        guard video.sideDataList?.contains(where: \.indicatesHDR) != true,
+              video.colorRange?.lowercased() == "tv",
               let colorSpace = video.colorSpace?.lowercased(), ["bt709", "smpte170m"].contains(colorSpace),
               let colorTransfer = video.colorTransfer?.lowercased(), ["bt709", "smpte170m"].contains(colorTransfer),
               let colorPrimaries = video.colorPrimaries?.lowercased(), ["bt709", "smpte170m"].contains(colorPrimaries)

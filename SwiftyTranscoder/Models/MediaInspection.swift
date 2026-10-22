@@ -1,7 +1,7 @@
 import Foundation
 
 struct MediaInspection: Decodable, Sendable {
-    let streams: [MediaStream]
+    var streams: [MediaStream]
     let chapters: [MediaChapter]
     let format: MediaFormat
 
@@ -47,10 +47,10 @@ struct MediaStream: Decodable, Identifiable, Sendable {
     let width: Int?
     let height: Int?
     let pixelFormat: String?
-    let colorRange: String?
-    let colorSpace: String?
-    let colorTransfer: String?
-    let colorPrimaries: String?
+    var colorRange: String?
+    var colorSpace: String?
+    var colorTransfer: String?
+    var colorPrimaries: String?
     let averageFrameRate: String?
     let duration: String?
     let numberOfFrames: String?
@@ -60,6 +60,9 @@ struct MediaStream: Decodable, Identifiable, Sendable {
     let bitRate: String?
     let tags: [String: String]?
     let disposition: StreamDisposition?
+
+    var colorInspectionNote: String?
+    var sideDataList: [ColorSideData]?
 
     var id: Int { index }
     var subtitleEvidence: SubtitleTrackEvidence? { SubtitleTrackEvidence(stream: self) }
@@ -119,6 +122,8 @@ struct MediaStream: Decodable, Identifiable, Sendable {
         case codecTagString = "codec_tag_string"
         case codecType = "codec_type"
         case pixelFormat = "pix_fmt"
+        case colorInspectionNote
+        case sideDataList = "side_data_list"
         case colorRange = "color_range"
         case colorSpace = "color_space"
         case colorTransfer = "color_transfer"

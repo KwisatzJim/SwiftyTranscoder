@@ -13,6 +13,7 @@ struct VideoConversionControlsView: View {
     let start: () -> Void
     @State private var partialPendingTrash: URL?
     @State private var trashError: String?
+    @State private var explanation: String?
 
     var body: some View {
         VStack(spacing: 8) {
@@ -90,6 +91,7 @@ struct VideoConversionControlsView: View {
                 )
 
             case .failed(let message, let partialOutput):
+                Button("Explain Error", systemImage: "sparkles") { explanation = message }
                 statusMessage(
                     "Conversion failed",
                     detail: message + (partialOutput.map {
@@ -100,6 +102,12 @@ struct VideoConversionControlsView: View {
             }
         }
         .frame(maxWidth: 760)
+        .sheet(isPresented: Binding(
+            get: { explanation != nil },
+            set: { if !$0 { explanation = nil } }
+        )) {
+            ConversionAssistantView(context: explanation ?? "", errorExplanation: true)
+        }
         .confirmationDialog(
             "Move this incomplete output to the Trash?",
             isPresented: Binding(

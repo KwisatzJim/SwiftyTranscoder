@@ -28,9 +28,9 @@ struct SwiftyTranscoderApp: App {
 enum SwiftyTranscoderEntryPoint {
     @MainActor
     static func main() async {
-        let arguments = Array(CommandLine.arguments.dropFirst())
-        // Finder launches (including legacy -psn arguments) retain the GUI path.
-        if arguments.isEmpty || arguments.first?.hasPrefix("-psn_") == true {
+        let arguments = AppLaunchArguments.userArguments(Array(CommandLine.arguments.dropFirst()))
+        // Finder and Xcode GUI launches retain the window path.
+        if arguments.isEmpty {
             SwiftyTranscoderApp.main()
         } else {
             exit(await CommandLineRunner.run(arguments))
