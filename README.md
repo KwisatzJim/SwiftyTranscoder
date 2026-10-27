@@ -103,6 +103,8 @@ swift test
 
 ## Local releases
 
+Version 1.8.1 (19) preserves MP4 filenames when saving to a different folder and retains source-path protection. See [1.8.1 release notes](Documentation/Release-1.8.1.md).
+
 Version 1.8.0 (18) adds reviewed sizing advice, on-device error explanations, bounded three-point color metadata inspection, and checksum-bound saved SDR confirmations. It also fixes Xcode GUI launch arguments, sandboxed packaging, and stale inspection updates. See [1.8.0 release notes](Documentation/Release-1.8.0.md). New builds require fresh notarization; the 1.7.0 ticket does not cover 1.8.0.
 
 The `v1.7.0-notarized` release packages the verified Developer ID-signed, Apple-notarized `1.7.0 (17)` app. It also includes the English-first audio selection fix and MOV input support added after the original v1.7.0 release. The earlier release remains available. The DMG itself is Developer ID-signed; the app inside carries Apple's notarization ticket.

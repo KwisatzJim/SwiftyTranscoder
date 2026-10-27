@@ -11,12 +11,20 @@ struct OutputNamingTests {
         #expect(result.path == "/Output/Movie.mp4")
     }
 
-    @Test func mp4AddsSuffixToProtectSourceName() {
+    @Test func mp4UsesOriginalBaseNameInDifferentFolder() {
         let result = OutputNaming.proposedURL(
             sourceURL: URL(fileURLWithPath: "/Source/Movie.MP4"),
             folderURL: URL(fileURLWithPath: "/Output", isDirectory: true)
         )
-        #expect(result.path == "/Output/Movie - SwiftyTranscoder.mp4")
+        #expect(result.path == "/Output/Movie.mp4")
+    }
+
+    @Test func mp4KeepsSuffixInSourceFolder() {
+        let result = OutputNaming.proposedURL(
+            sourceURL: URL(fileURLWithPath: "/Source/Movie.MP4"),
+            folderURL: URL(fileURLWithPath: "/Source", isDirectory: true)
+        )
+        #expect(result.path == "/Source/Movie - SwiftyTranscoder.mp4")
     }
 
     @Test func m4vAlsoAddsSuffix() {
