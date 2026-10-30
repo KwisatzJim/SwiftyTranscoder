@@ -98,6 +98,7 @@ done
 "$ffmpeg_path" -hide_banner -encoders | grep -q 'hevc_videotoolbox'
 "$ffmpeg_path" -hide_banner -encoders | grep -q ' png '
 "$ffmpeg_path" -hide_banner -decoders | grep -q ' png '
+"$ffmpeg_path" -hide_banner -decoders | grep -q ' mov_text '
 "$ffmpeg_path" -hide_banner -formats | grep -q ' image2 '
 "$ffmpeg_path" -hide_banner -demuxers | grep -q ' concat '
 

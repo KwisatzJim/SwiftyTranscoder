@@ -38,11 +38,14 @@ struct ConversionPlan: Sendable {
         sourceHeight = video?.height ?? 0
         let dimensions = outputResolution.dimensions(width: video?.width ?? 0, height: video?.height ?? 0)
         let scalesVideo = dimensions != nil && (dimensions?.width != video?.width || dimensions?.height != video?.height)
+        let burnsSubtitles: Bool
+        if case .burnIn = subtitleSelection { burnsSubtitles = true }
+        else { burnsSubtitles = false }
         videoFormat = restorationPlan.map {
             "\($0.method.rawValue), then HEVC using Apple hardware"
-        } ?? (isMP4Source && !scalesVideo
+        } ?? (isMP4Source && !scalesVideo && !burnsSubtitles
             ? "Copy source video unchanged (no re-encoding)"
-            : "HEVC using Apple hardware")
+            : burnsSubtitles ? "HEVC using Apple hardware (re-encode to burn subtitles)" : "HEVC using Apple hardware")
         let ordinaryDimensions = scalesVideo && dimensions != nil
             ? "\(video?.width ?? 0)×\(video?.height ?? 0) → \(dimensions!.width)×\(dimensions!.height)"
             : summary.video.map { "Preserve source (\($0.resolution)); never upscale" } ?? "Unknown—conversion blocked"

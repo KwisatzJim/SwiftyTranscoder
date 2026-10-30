@@ -19,9 +19,9 @@ Scripts/swiftytranscoder "/path/to/input.mkv" --preset plex --output "/path/to/o
 Scripts/swiftytranscoder "/path/to/input.mp4" --preset plex --gain-db 6 --output "/path/to/output.mp4"
 ```
 
-The Plex preset defaults to protected +6 dB gain, primary AC-3, and secondary AAC stereo. `--gain-db 0` disables gain; `--aac-stereo off` disables the secondary track. Compatible SDR H.264/HEVC MP4/M4V inputs copy video unchanged while re-encoding audio. Reprocessing an already boosted file applies gain again, so use the original when gain is wanted only once.
+The Plex preset defaults to protected +6 dB gain, primary AC-3, and secondary AAC stereo. `--gain-db 0` disables gain; `--aac-stereo off` disables the secondary track. Compatible SDR H.264/HEVC MP4/M4V inputs copy video unchanged while re-encoding audio, unless resizing or subtitle burn-in is selected. Reprocessing an already boosted file applies gain again, so use the original when gain is wanted only once.
 
-Use `--dry-run` to inspect and print the plan without creating output. Sources containing subtitle streams require an explicit `--subtitles omit` or `--subtitles INDEX` choice using a source stream index; burn-in accepts SubRip on MKV only. Untagged MKV video requires `--assume-bt709` only after confirming it is SDR. Existing files are refused, output validation precedes final promotion, and Ctrl-C retains any partial output. Exit codes are 0 for success, 1 for processing failure, 2 for usage errors, and 130 for cancellation. Use `--restore lightweight` for explicit AI restoration, and `--checkpoint-dir PATH` with `--resume` for saved jobs. See [CLI usage](Documentation/CLI-Usage.txt).
+Use `--dry-run` to inspect and print the plan without creating output. Sources containing subtitle streams require an explicit `--subtitles omit` or `--subtitles INDEX` choice using a source stream index; ordinary burn-in accepts SubRip and MP4 timed text (mov_text), re-encoding video to HEVC. Untagged MKV video requires `--assume-bt709` only after confirming it is SDR. Existing files are refused, output validation precedes final promotion, and Ctrl-C retains any partial output. Exit codes are 0 for success, 1 for processing failure, 2 for usage errors, and 130 for cancellation. Use `--restore lightweight` for explicit AI restoration, and `--checkpoint-dir PATH` with `--resume` for saved jobs. See [CLI usage](Documentation/CLI-Usage.txt).
 
 The launcher defaults to `/Applications/SwiftyTranscoder.app` when the override is absent. Do not target the older 1.1.0 bundle for CLI use. Packaging does not install the app, modify your shell settings, or install a system command automatically.
 
@@ -102,6 +102,8 @@ swift test
 ```
 
 ## Local releases
+
+Version 1.8.2 (20) adds MP4 subtitle burn-in and includes the required timed-text decoder. See [1.8.2 release notes](Documentation/Release-1.8.2.md).
 
 Version 1.8.1 (19) preserves MP4 filenames when saving to a different folder and retains source-path protection. See [1.8.1 release notes](Documentation/Release-1.8.1.md).
 

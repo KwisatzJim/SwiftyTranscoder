@@ -25,7 +25,8 @@ File size depends on content and duration; these choices do not guarantee an ema
 Plex defaults: protected +6 dB gain, primary AC-3, secondary AAC stereo.
 Use --gain-db 0 for already-boosted files to avoid applying gain twice.
 MP4/M4V/MOV processing copies compatible SDR H.264/HEVC video unchanged
-unless resizing is selected, and re-encodes audio.
+unless resizing or subtitle burn-in is selected, and re-encodes audio.
+Ordinary subtitle burn-in supports SubRip and MP4 timed text (mov_text).
 Subtitle-bearing inputs require --subtitles omit or --subtitles INDEX.
 Untagged MKV SDR needs --assume-bt709 after confirming its color.
 Existing destinations and partial files are refused; output must end in .mp4.

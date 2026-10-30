@@ -71,7 +71,10 @@ struct VideoConversionCommand: Sendable {
         outputWidth = dimensions?.width ?? video.width
         outputHeight = dimensions?.height ?? video.height
         let scalesVideo = outputWidth != video.width || outputHeight != video.height
-        videoMode = isMP4Source && !scalesVideo ? .copyVideo : .transcodeToHEVC
+        let burnsSubtitles: Bool
+        if case .burnIn = subtitleSelection { burnsSubtitles = true }
+        else { burnsSubtitles = false }
+        videoMode = isMP4Source && !scalesVideo && !burnsSubtitles ? .copyVideo : .transcodeToHEVC
 
         guard ["h264", "hevc"].contains(video.codecName?.lowercased()) else {
             throw VideoConversionCommandError.unsupportedCodec(
@@ -141,15 +144,12 @@ struct VideoConversionCommand: Sendable {
         var videoFilters: [String] = []
         switch subtitleSelection {
         case .burnIn(let streamIndex):
-            guard videoMode != .copyVideo else {
-                throw VideoConversionCommandError.mp4SubtitleBurnInRequiresTranscode
-            }
             guard let subtitleOrdinal = inspection.subtitleStreams.firstIndex(where: {
                 $0.index == streamIndex
             }), let stream = inspection.subtitleStreams[safe: subtitleOrdinal] else {
                 throw VideoConversionCommandError.subtitleNotFound(streamIndex: streamIndex)
             }
-            guard stream.codecName == "subrip" else {
+            guard ["subrip", "mov_text"].contains(stream.codecName) else {
                 throw VideoConversionCommandError.unsupportedSubtitle(
                     streamIndex: streamIndex,
                     codec: stream.codecName ?? "unknown"
@@ -285,7 +285,6 @@ private extension Collection {
 }
 
 enum VideoConversionCommandError: LocalizedError {
-    case mp4SubtitleBurnInRequiresTranscode
     case noVideo(file: String)
     case noAudio(file: String)
     case unsupportedAudio(file: String, layout: String, sampleRate: String)
@@ -304,8 +303,6 @@ enum VideoConversionCommandError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .mp4SubtitleBurnInRequiresTranscode:
-            "MP4/M4V processing copies video unchanged. Choose Omit subtitles; burning subtitles would require re-encoding the video."
         case .noVideo(let file):
             "\(file) has no video stream to convert."
         case .noAudio(let file):
@@ -333,7 +330,7 @@ enum VideoConversionCommandError: LocalizedError {
         case .subtitleNotFound(let streamIndex):
             "Selected subtitle stream \(streamIndex) is no longer present in the inspected source."
         case .unsupportedSubtitle(let streamIndex, let codec):
-            "Selected subtitle stream \(streamIndex) uses unsupported codec \(codec). This burn-in path currently supports SubRip."
+            "Selected subtitle stream \(streamIndex) uses unsupported codec \(codec). This burn-in path supports SubRip and MP4 timed text (mov_text)."
         case .subtitleChoiceRequired:
             "Choose a subtitle track or select Omit subtitles before conversion."
         }

@@ -105,7 +105,7 @@ struct CLIArguments: Equatable, Sendable {
     Usage: swiftytranscoder INPUT --preset plex --output OUTPUT.mp4 [options]
     Input: MKV, or compatible SDR H.264/HEVC MP4/M4V/MOV.
     Plex defaults: protected +6 dB gain, primary AC-3, optional AAC stereo on.
-    By default, MP4/M4V/MOV video is copied; MKV video uses hardware HEVC.
+    MP4/M4V/MOV video is copied unless resizing or burning subtitles; otherwise hardware HEVC.
     --restore lightweight enables explicit AI restoration with hardware HEVC output.
 
       --restore lightweight   Restore eligible tagged SDR video using FSRCNN
@@ -115,7 +115,7 @@ struct CLIArguments: Equatable, Sendable {
       --audio convert|omit     Convert audio (default) or remove all audio tracks
       --gain-db 0|6            Audio gain (default: 6, peak protected)
       --aac-stereo on|off      Secondary AAC stereo (default: on)
-      --subtitles omit|INDEX   Omit or burn a source SubRip stream index
+      --subtitles omit|INDEX   Omit or burn a source SubRip or MP4 timed-text stream index
                               Required when subtitle streams are present
       --assume-bt709           Confirm untagged MKV video as SDR BT.709
       --dry-run               Inspect and print the plan without converting

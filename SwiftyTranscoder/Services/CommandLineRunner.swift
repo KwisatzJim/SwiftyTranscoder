@@ -47,7 +47,7 @@ enum CommandLineRunner {
             }
             guard options.subtitles != nil || inspection.subtitleStreams.isEmpty else {
                 let tracks = inspection.subtitleStreams.map { "\($0.index): \($0.codecName ?? "unknown")" }.joined(separator: ", ")
-                throw CLIUsageError("Choose --subtitles omit or a SubRip stream index. Available: \(tracks)")
+                throw CLIUsageError("Choose --subtitles omit or a SubRip or MP4 timed-text stream index. Available: \(tracks)")
             }
             let subtitles: SubtitleSelection = options.subtitles.flatMap(Int.init).map {
                 .burnIn(streamIndex: $0)
