@@ -26,6 +26,14 @@ struct CLIArgumentsTests {
         #expect(options.assumeBT709 && options.dryRun)
     }
 
+    @Test func parsesForceReencodeAndRejectsRestorationCombination() throws {
+        let args = ["input.mp4", "--output", "output.mp4"]
+        #expect(try !CLIArguments(args).forceReencode)
+        #expect(try CLIArguments(args + ["--force-reencode", "--assume-bt709"]).forceReencode)
+        #expect(throws: CLIUsageError.self) { try CLIArguments(args + ["--force-reencode", "--force-reencode"]) }
+        #expect(throws: CLIUsageError.self) { try CLIArguments(args + ["--force-reencode", "--restore", "lightweight"]) }
+    }
+
     @Test func parsesExplicitLightweightRestoration() throws {
         let options = try CLIArguments(["input.m4v", "--output", "output.mp4", "--restore", "lightweight", "--dry-run"])
         #expect(options.restorationMethod == .lightweightFSRCNN)

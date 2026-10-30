@@ -9,6 +9,7 @@ struct ConversionPlanView: View {
     let sourceDynamicRange: String?
     let allowsAudioRemoval: Bool
     @Binding var removeAudio: Bool
+    @Binding var forceReencode: Bool
     @Binding var outputResolution: OutputResolution
     @Binding var gainEnabled: Bool
     @Binding var aacStereoEnabled: Bool
@@ -27,6 +28,15 @@ struct ConversionPlanView: View {
                 Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 6) {
                     planRow("Container", plan.container)
                     planRow("Video", plan.videoFormat)
+                    GridRow {
+                        Text("Re-encode").foregroundStyle(.secondary)
+                        Toggle("Re-encode video to HEVC", isOn: $forceReencode)
+                            .toggleStyle(.switch)
+                            .disabled(!allowsAudioRemoval)
+                            .help("Encode video using Apple hardware even at its original size. MKV video is always re-encoded.")
+                            .gridColumnAlignment(.leading)
+                    }
+                    .font(.callout)
                     GridRow {
                         Text("Output size").foregroundStyle(.secondary)
                         Picker("Output size", selection: $outputResolution) {
@@ -180,10 +190,12 @@ struct ConversionPlanView: View {
                 Remove all audio selected: \(removeAudio)
                 Audio: \(plan.audioFormat)
                 Gain: \(plan.audioGain)
+                Force HEVC re-encoding selected: \(forceReencode)
                 Output size selection: \(outputResolution.label)
                 Ordinary resizing and audio-removal controls available: \(allowsAudioRemoval)
                 Warnings: \(plan.warnings.joined(separator: "; "))
                 """, errorExplanation: false, currentSettings: """
+                Re-encode video to HEVC: \(forceReencode ? "On" : "Off")
                 Output size: \(outputResolution.label)
                 Remove all audio: \(removeAudio ? "On" : "Off — keep audio")
                 Audio: \(plan.audioFormat)

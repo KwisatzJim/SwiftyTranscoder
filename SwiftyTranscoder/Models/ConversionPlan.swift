@@ -24,6 +24,7 @@ struct ConversionPlan: Sendable {
         aacStereoEnabled: Bool = false,
         audioMode: ConversionAudioMode = .convert,
         outputResolution: OutputResolution = .original,
+        forceReencode: Bool = false,
         colorSelection: ColorSelection,
         subtitleSelection: SubtitleSelection,
         restorationPlan: RestorationPlan? = nil,
@@ -43,7 +44,7 @@ struct ConversionPlan: Sendable {
         else { burnsSubtitles = false }
         videoFormat = restorationPlan.map {
             "\($0.method.rawValue), then HEVC using Apple hardware"
-        } ?? (isMP4Source && !scalesVideo && !burnsSubtitles
+        } ?? (isMP4Source && !forceReencode && colorSelection != .confirmUntaggedAsBT709 && !scalesVideo && !burnsSubtitles
             ? "Copy source video unchanged (no re-encoding)"
             : burnsSubtitles ? "HEVC using Apple hardware (re-encode to burn subtitles)" : "HEVC using Apple hardware")
         let ordinaryDimensions = scalesVideo && dimensions != nil

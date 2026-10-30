@@ -8,6 +8,7 @@ struct CLIArguments: Equatable, Sendable {
     var gainDB = 6
     var aacStereo = true
     var subtitles: String?
+    var forceReencode = false
     var assumeBT709 = false
     var restorationMethod: RestorationMethod?
     var checkpointDirectory: String?
@@ -40,6 +41,7 @@ struct CLIArguments: Equatable, Sendable {
                 case "--resume": resume = true
                 case "--help": help = true
                 case "--dry-run": dryRun = true
+                case "--force-reencode": forceReencode = true
                 case "--assume-bt709": assumeBT709 = true
                 case "--restore":
                     guard try value() == "lightweight" else {
@@ -80,6 +82,7 @@ struct CLIArguments: Equatable, Sendable {
         guard !help else { return }
         guard audioMode != .omit || restorationMethod == nil else { throw CLIUsageError("--audio omit currently applies to ordinary conversion. Remove --restore to create video-only output.") }
         guard outputResolution == .original || restorationMethod == nil else { throw CLIUsageError("--resolution applies to ordinary conversion; remove --restore.") }
+        guard !forceReencode || restorationMethod == nil else { throw CLIUsageError("--force-reencode applies to ordinary conversion; remove --restore.") }
         guard !resume || checkpointDirectory != nil else { throw CLIUsageError("--resume requires --checkpoint-dir.") }
         guard checkpointDirectory == nil || restorationMethod != nil else { throw CLIUsageError("--checkpoint-dir requires --restore lightweight.") }
         if let checkpointDirectory {
@@ -105,7 +108,7 @@ struct CLIArguments: Equatable, Sendable {
     Usage: swiftytranscoder INPUT --preset plex --output OUTPUT.mp4 [options]
     Input: MKV, or compatible SDR H.264/HEVC MP4/M4V/MOV.
     Plex defaults: protected +6 dB gain, primary AC-3, optional AAC stereo on.
-    MP4/M4V/MOV video is copied unless resizing or burning subtitles; otherwise hardware HEVC.
+    MP4/M4V/MOV video is copied unless resizing, burning subtitles, or re-encoding; otherwise hardware HEVC.
     --restore lightweight enables explicit AI restoration with hardware HEVC output.
 
       --restore lightweight   Restore eligible tagged SDR video using FSRCNN
@@ -117,7 +120,8 @@ struct CLIArguments: Equatable, Sendable {
       --aac-stereo on|off      Secondary AAC stereo (default: on)
       --subtitles omit|INDEX   Omit or burn a source SubRip or MP4 timed-text stream index
                               Required when subtitle streams are present
-      --assume-bt709           Confirm untagged MKV video as SDR BT.709
+      --force-reencode         Encode video to hardware HEVC even without resizing
+      --assume-bt709           Confirm untagged MKV/MP4 SDR as BT.709 (re-encodes video)
       --dry-run               Inspect and print the plan without converting
       --help, -h              Show this help
       --                      Treat remaining arguments as positional paths

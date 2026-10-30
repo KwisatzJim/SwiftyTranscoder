@@ -25,10 +25,13 @@ File size depends on content and duration; these choices do not guarantee an ema
 Plex defaults: protected +6 dB gain, primary AC-3, secondary AAC stereo.
 Use --gain-db 0 for already-boosted files to avoid applying gain twice.
 MP4/M4V/MOV processing copies compatible SDR H.264/HEVC video unchanged
-unless resizing or subtitle burn-in is selected, and re-encodes audio.
+unless resizing, subtitle burn-in, or --force-reencode is selected, and re-encodes audio.
 Ordinary subtitle burn-in supports SubRip and MP4 timed text (mov_text).
 Subtitle-bearing inputs require --subtitles omit or --subtitles INDEX.
-Untagged MKV SDR needs --assume-bt709 after confirming its color.
+Untagged MKV/MP4 SDR needs --assume-bt709 after confirming its color; this re-encodes
+video with BT.709 tags. HDR and unsupported codecs/pixel formats remain refused.
+Use --force-reencode to encode video to Apple hardware HEVC at its original size.
+This option applies to ordinary conversion and cannot be combined with --restore.
 Existing destinations and partial files are refused; output must end in .mp4.
 Ctrl-C cancels and retains a labeled partial file when one exists.
 Exit codes: 0 success, 1 processing failure, 2 usage error, 130 cancelled.

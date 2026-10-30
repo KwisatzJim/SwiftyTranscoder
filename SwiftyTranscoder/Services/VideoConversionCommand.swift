@@ -59,6 +59,7 @@ struct VideoConversionCommand: Sendable {
         subtitleSelection: SubtitleSelection,
         audioMode: ConversionAudioMode = .convert,
         outputResolution: OutputResolution = .original,
+        forceReencode: Bool = false,
         bundleURL: URL = Bundle.main.bundleURL,
         fileManager: FileManager = .default
     ) throws {
@@ -74,7 +75,7 @@ struct VideoConversionCommand: Sendable {
         let burnsSubtitles: Bool
         if case .burnIn = subtitleSelection { burnsSubtitles = true }
         else { burnsSubtitles = false }
-        videoMode = isMP4Source && !scalesVideo && !burnsSubtitles ? .copyVideo : .transcodeToHEVC
+        videoMode = isMP4Source && !forceReencode && colorSelection != .confirmUntaggedAsBT709 && !scalesVideo && !burnsSubtitles ? .copyVideo : .transcodeToHEVC
 
         guard ["h264", "hevc"].contains(video.codecName?.lowercased()) else {
             throw VideoConversionCommandError.unsupportedCodec(
@@ -92,7 +93,7 @@ struct VideoConversionCommand: Sendable {
 
         let sourceDynamicRange = VideoSummary(stream: video).dynamicRange
         guard colorSelection == .preserveConfirmedSDR && sourceDynamicRange == "SDR"
-                || !isMP4Source && colorSelection == .confirmUntaggedAsBT709 && sourceDynamicRange == "Not identified" else {
+                || ["mkv", "mp4"].contains(sourceURL.pathExtension.lowercased()) && colorSelection == .confirmUntaggedAsBT709 && sourceDynamicRange == "Not identified" else {
             throw VideoConversionCommandError.unconfirmedColor(
                 file: sourceURL.lastPathComponent
             )
@@ -165,7 +166,7 @@ struct VideoConversionCommand: Sendable {
         case .needsChoice:
             throw VideoConversionCommandError.subtitleChoiceRequired
         }
-        if !isMP4Source && colorSelection == .confirmUntaggedAsBT709 {
+        if ["mkv", "mp4"].contains(sourceURL.pathExtension.lowercased()) && colorSelection == .confirmUntaggedAsBT709 {
             videoFilters.append("setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709")
         }
 

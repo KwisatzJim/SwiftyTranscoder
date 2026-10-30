@@ -40,6 +40,7 @@ struct ContentView: View {
     @State private var selectionError: String?
     @State private var notificationError: String?
     @State private var queueIndexPendingRemoval: Int?
+    @State private var forceReencode = false
     @State private var outputResolution: OutputResolution = .original
     @State private var removeAudio = false
     @State private var gainEnabled = true
@@ -633,6 +634,7 @@ struct ContentView: View {
                     aacStereoEnabled: aacStereoEnabled,
                     audioMode: removeAudio ? .omit : .convert,
                     outputResolution: outputResolution,
+                    forceReencode: forceReencode,
                     colorSelection: colorSelection,
                     subtitleSelection: subtitleSelection,
                     restorationPlan: restorationEnabled ? restorationPlan : nil,
@@ -645,6 +647,7 @@ struct ContentView: View {
                 sourceDynamicRange: MediaSummary(inspection: inspection).video?.dynamicRange,
                 allowsAudioRemoval: !restorationEnabled,
                 removeAudio: $removeAudio,
+                forceReencode: $forceReencode,
                 outputResolution: $outputResolution,
                 gainEnabled: $gainEnabled,
                 aacStereoEnabled: $aacStereoEnabled,
@@ -877,6 +880,7 @@ struct ContentView: View {
         selectedSource = source
         inspection = nil
         outputResolution = .original
+        forceReencode = false
         removeAudio = false
         gainEnabled = defaultGainEnabled
         aacStereoEnabled = defaultAACStereoEnabled
@@ -974,7 +978,8 @@ struct ContentView: View {
                 colorSelection: colorSelection,
                 subtitleSelection: subtitleSelection,
                 audioMode: removeAudio ? .omit : .convert,
-                outputResolution: outputResolution
+                outputResolution: outputResolution,
+                forceReencode: forceReencode
             )
             return nil
         } catch {
@@ -1036,7 +1041,8 @@ struct ContentView: View {
                 colorSelection: colorSelection,
                 subtitleSelection: subtitleSelection,
                 audioMode: removeAudio ? .omit : .convert,
-                outputResolution: outputResolution
+                outputResolution: outputResolution,
+                forceReencode: forceReencode
             )
             guard let expectedVideo = inspection.videoStreams.first,
                   let duration = (removeAudio ? ConversionAudioMode.omit : .convert).expectedDuration(in: inspection) else {
@@ -1104,7 +1110,8 @@ struct ContentView: View {
                 colorSelection: colorSelection,
                 subtitleSelection: subtitleSelection,
                 audioMode: removeAudio ? .omit : .convert,
-                outputResolution: outputResolution
+                outputResolution: outputResolution,
+                forceReencode: forceReencode
             )
             guard let outputURL else { return }
             approvedPlans[currentQueueIndex] = ApprovedConversion(
@@ -1114,6 +1121,7 @@ struct ContentView: View {
                 gainEnabled: gainEnabled,
                 aacStereoEnabled: aacStereoEnabled,
                 outputResolution: outputResolution,
+                forceReencode: forceReencode,
                 removeAudio: removeAudio,
                 colorSelection: colorSelection,
                 subtitleSelection: subtitleSelection,
@@ -1166,6 +1174,7 @@ struct ContentView: View {
         aacStereoEnabled = approved.aacStereoEnabled
         removeAudio = approved.removeAudio
         outputResolution = approved.outputResolution
+        forceReencode = approved.forceReencode
         colorSelection = approved.colorSelection
         subtitleSelection = approved.subtitleSelection
         restorationEnabled = approved.restorationPlan != nil
@@ -1305,6 +1314,7 @@ struct ContentView: View {
         aacStereoEnabled = approved.aacStereoEnabled
         removeAudio = approved.removeAudio
         outputResolution = approved.outputResolution
+        forceReencode = approved.forceReencode
         colorSelection = approved.colorSelection
         subtitleSelection = approved.subtitleSelection
         conversionController.reset()
@@ -1414,6 +1424,7 @@ private struct ApprovedConversion {
     let gainEnabled: Bool
     let aacStereoEnabled: Bool
     let outputResolution: OutputResolution
+    let forceReencode: Bool
     let removeAudio: Bool
     let colorSelection: ColorSelection
     let subtitleSelection: SubtitleSelection

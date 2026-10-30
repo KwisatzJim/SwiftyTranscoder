@@ -37,13 +37,13 @@ enum CommandLineRunner {
             let audio = inspection.preferredAudioStream
             var color = ColorSelection(video: video)
             if options.assumeBT709 {
-                guard source.pathExtension.lowercased() == "mkv", color == .needsConfirmation else {
-                    throw CLIUsageError("--assume-bt709 applies only to untagged MKV SDR video.")
+                guard ["mkv", "mp4"].contains(source.pathExtension.lowercased()), color == .needsConfirmation else {
+                    throw CLIUsageError("--assume-bt709 applies only to untagged MKV/MP4 SDR video.")
                 }
                 color = .confirmUntaggedAsBT709
             }
             guard color == .preserveConfirmedSDR || color == .confirmUntaggedAsBT709 else {
-                throw CLIUsageError("HDR is unsupported. Untagged MKV needs explicit --assume-bt709 confirmation; untagged MP4 cannot be processed.")
+                throw CLIUsageError("HDR is unsupported. Untagged MKV/MP4 needs explicit --assume-bt709 confirmation; untagged M4V/MOV is unsupported.")
             }
             guard options.subtitles != nil || inspection.subtitleStreams.isEmpty else {
                 let tracks = inspection.subtitleStreams.map { "\($0.index): \($0.codecName ?? "unknown")" }.joined(separator: ", ")
@@ -56,7 +56,7 @@ enum CommandLineRunner {
                 sourceURL: source, outputURL: output, inspection: inspection,
                 gainEnabled: options.gainDB == 6, aacStereoEnabled: options.aacStereo,
                 colorSelection: color, subtitleSelection: subtitles, audioMode: options.audioMode,
-                outputResolution: options.outputResolution
+                outputResolution: options.outputResolution, forceReencode: options.forceReencode
             )
             let restorationPlan: RestorationPlan?
             if let method = options.restorationMethod {

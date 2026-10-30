@@ -4,7 +4,7 @@ SwiftyTranscoder is a native macOS SwiftUI application for turning MKV and compa
 
 ## Download and install
 
-Download **SwiftyTranscoder_1.8.0_arm64.dmg** from [the latest release](https://github.com/KwisatzJim/SwiftyTranscoder/releases/latest), open it, and drag the app to **Applications**. Requires an Apple Silicon Mac running macOS 14 or later.
+Download **SwiftyTranscoder_1.8.3_arm64.dmg** from [the latest release](https://github.com/KwisatzJim/SwiftyTranscoder/releases/latest), open it, and drag the app to **Applications**. Requires an Apple Silicon Mac running macOS 14 or later.
 
 The latest release is signed with Developer ID and notarized by Apple, with the notarization ticket attached for offline verification. Installation and conversion were also confirmed on a second Mac (Neo). The release includes a SHA-256 checksum, its CLI launcher, and usage instructions. FFmpeg and the AI models are bundled; Python and Homebrew are not required to run the app.
 
@@ -21,7 +21,7 @@ Scripts/swiftytranscoder "/path/to/input.mp4" --preset plex --gain-db 6 --output
 
 The Plex preset defaults to protected +6 dB gain, primary AC-3, and secondary AAC stereo. `--gain-db 0` disables gain; `--aac-stereo off` disables the secondary track. Compatible SDR H.264/HEVC MP4/M4V inputs copy video unchanged while re-encoding audio, unless resizing or subtitle burn-in is selected. Reprocessing an already boosted file applies gain again, so use the original when gain is wanted only once.
 
-Use `--dry-run` to inspect and print the plan without creating output. Sources containing subtitle streams require an explicit `--subtitles omit` or `--subtitles INDEX` choice using a source stream index; ordinary burn-in accepts SubRip and MP4 timed text (mov_text), re-encoding video to HEVC. Untagged MKV video requires `--assume-bt709` only after confirming it is SDR. Existing files are refused, output validation precedes final promotion, and Ctrl-C retains any partial output. Exit codes are 0 for success, 1 for processing failure, 2 for usage errors, and 130 for cancellation. Use `--restore lightweight` for explicit AI restoration, and `--checkpoint-dir PATH` with `--resume` for saved jobs. See [CLI usage](Documentation/CLI-Usage.txt).
+Use `--dry-run` to inspect and print the plan without creating output. Sources containing subtitle streams require an explicit `--subtitles omit` or `--subtitles INDEX` choice using a source stream index; ordinary burn-in accepts SubRip and MP4 timed text (mov_text), re-encoding video to HEVC. Untagged MKV/MP4 video requires `--assume-bt709` only after confirming it is SDR. Existing files are refused, output validation precedes final promotion, and Ctrl-C retains any partial output. Exit codes are 0 for success, 1 for processing failure, 2 for usage errors, and 130 for cancellation. Use `--restore lightweight` for explicit AI restoration, and `--checkpoint-dir PATH` with `--resume` for saved jobs. See [CLI usage](Documentation/CLI-Usage.txt).
 
 The launcher defaults to `/Applications/SwiftyTranscoder.app` when the override is absent. Do not target the older 1.1.0 bundle for CLI use. Packaging does not install the app, modify your shell settings, or install a system command automatically.
 
@@ -101,7 +101,11 @@ Run the Swift regression tests with:
 swift test
 ```
 
+The proposed conversion offers **Re-encode video to HEVC** to encode compatible MP4/M4V/MOV video at its original size using Apple hardware. MKV video already uses this encoding path.
+
 ## Local releases
+
+Version 1.8.3 (21) adds explicit HEVC re-encoding in the GUI and CLI, and checked SDR BT.709 confirmation for untagged MP4. See [1.8.3 release notes](Documentation/Release-1.8.3.md).
 
 Version 1.8.2 (20) adds MP4 subtitle burn-in and includes the required timed-text decoder. See [1.8.2 release notes](Documentation/Release-1.8.2.md).
 
@@ -235,3 +239,5 @@ these changes; batch resume remains a later enhancement.
 ## License
 
 Original SwiftyTranscoder code is available under the [MIT license](LICENSE). Bundled third-party software and AI models keep their own licenses; see [Third-party components](Documentation/ThirdPartyComponents.md). Release downloads include component source archives and notices as well as the installer.
+
+Use `--force-reencode` to encode compatible video to Apple hardware HEVC even at its original size (ordinary conversion only). `--assume-bt709` also re-encodes untagged MKV/MP4 after you confirm it is SDR BT.709; HDR, unsupported codecs, and unsupported pixel formats remain refused.
